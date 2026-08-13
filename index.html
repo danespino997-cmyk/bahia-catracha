@@ -183,6 +183,8 @@
     color:#fff;border-radius:10px;width:34px;height:34px;font-size:15px;
     display:flex;align-items:center;justify-content:center;flex:none;
   }
+  .budget-bar-track{height:8px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:10px;}
+  .budget-bar-fill{height:100%;border-radius:999px;transition:width .2s ease;}
 </style>
 </head>
 <body>
@@ -272,6 +274,9 @@ function timeAgo(ts){
 function fmtDateTime(ts){
   return new Date(ts).toLocaleString('es-HN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
+function fmtDateOnly(dateStr){
+  return new Date(dateStr+'T12:00:00').toLocaleDateString('es-HN',{day:'2-digit',month:'short',year:'numeric'});
+}
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -283,6 +288,7 @@ const state = {
   activeTab:'pedidos', orderFilter:'activos', financeRange:'hoy', historySearch:'',
   modalOpen:false, newOrderCart:{}, draftTable:'', draftCustomer:'',
   busy:false, currentEmail:null, isAdmin:false,
+  expenseBudget:0, closings:[],
 };
 
 /* ---------------- data layer (Supabase) ---------------- */
@@ -318,6 +324,16 @@ async function loadAll(){
   state.expenses = expRes.data.map(mapExpense);
   state.loaded = true;
   setSyncing(false, true);
+
+  const budgetRes = await supabaseClient.from('settings').select('*').eq('key','expense_budget').maybeSingle();
+  state.expenseBudget = (!budgetRes.error && budgetRes.data) ? Number(budgetRes.data.amount) : 0;
+
+  const closingsRes = await supabaseClient.from('daily_closings').select('*').order('closing_date', {ascending:false}).order('created_at', {ascending:false}).limit(30);
+  state.closings = (!closingsRes.error && closingsRes.data) ? closingsRes.data.map(r => ({
+    id:r.id, date:r.closing_date, totalSales:Number(r.total_sales), totalExpenses:Number(r.total_expenses),
+    orderCount:r.order_count, closedBy:r.closed_by, createdAt:new Date(r.created_at).getTime(),
+  })) : [];
+
   renderAll();
 }
 
@@ -577,27 +593,66 @@ function renderFinanzas(){
   const income = paidOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const expenses = state.expenses.filter(e=> e.date>=start);
   const expenseTotal = expenses.reduce((s,e)=>s+e.amount,0);
-  const balance = income - expenseTotal;
+
+  const todayStart = rangeStart('hoy');
+  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart);
+  const todaysSalesTotal = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
+
   const chips = [{id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}]
     .map(c=>`<button class="chip ${state.financeRange===c.id?'active':''}" onclick="setFinanceRange('${c.id}')">${c.label}</button>`).join('');
+
   const recentOrders = paidOrders.sort((a,b)=>b.paidAt-a.paidAt).slice(0,8).map(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
     return `<div class="list-row"><span>Mesa ${escapeHtml(o.table)} · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span><strong>${money(total)}</strong></div>`;
   }).join('') || `<p class="muted" style="padding:8px 0;">Aún no hay ventas cobradas en este período.</p>`;
+
   const expenseRows = expenses.sort((a,b)=>b.date-a.date).map(e=>`
     <div class="list-row"><span>${escapeHtml(e.description)}<br><span class="meta">${escapeHtml(e.category)} · ${fmtDateTime(e.date)}</span></span>
     <div style="display:flex;align-items:center;gap:8px;"><strong>${money(e.amount)}</strong>
     <button class="icon-btn" onclick="deleteExpense('${e.id}')">${ICONS.trash}</button></div></div>`).join('') || `<p class="muted" style="padding:8px 0;">Sin gastos registrados en este período.</p>`;
+
+  const closingsRows = state.closings.slice(0,6).map(c=>`
+    <div class="list-row"><span>${fmtDateOnly(c.date)}<br><span class="meta">${c.orderCount} pedido(s)${c.closedBy? ' · '+escapeHtml(c.closedBy):''}</span></span><strong>${money(c.totalSales)}</strong></div>
+  `).join('') || `<p class="muted" style="padding:8px 0;">Aún no se ha hecho ningún cierre.</p>`;
+
+  const budgetPct = state.expenseBudget>0 ? Math.min(100, (expenseTotal/state.expenseBudget)*100) : 0;
+  const overBudget = state.expenseBudget>0 && expenseTotal>state.expenseBudget;
+
   return `
     <div class="chips">${chips}</div>
     <div class="stat-grid">
       <div class="stat-card income"><div class="label">Ingresos</div><div class="value">${money(income)}</div></div>
       <div class="stat-card expense"><div class="label">Gastos</div><div class="value">${money(expenseTotal)}</div></div>
-      <div class="stat-card wide ${balance>=0?'balance-pos':'balance-neg'}"><div class="label">Balance neto</div><div class="value">${money(balance)}</div></div>
     </div>
-    <div class="section-title"><h2>Ventas recientes</h2></div><div class="card">${recentOrders}</div>
+
+    <div class="section-title"><h2>Cierre de caja</h2></div>
+    <div class="card">
+      <div class="list-row" style="border:none;padding-top:0;">
+        <span>Ventas de hoy sin cerrar<br><span class="meta">${todaysPaid.length} pedido(s) cobrados</span></span>
+        <strong>${money(todaysSalesTotal)}</strong>
+      </div>
+      <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="performDailyClosing()">Realizar cierre del día</button>
+    </div>
+    <div class="section-title"><h2>Cierres recientes</h2></div>
+    <div class="card">${closingsRows}</div>
+
+    <div class="section-title"><h2>Ventas recientes</h2></div>
+    <div class="card">${recentOrders}</div>
+
     <div class="section-title"><h2>Gastos</h2><button class="btn btn-ghost btn-sm" onclick="openExpenseModal()">${ICONS.plus} Agregar</button></div>
-    <div class="card">${expenseRows}</div>`;
+
+    <div class="card">
+      <div class="list-row" style="border:none;padding-top:0;">
+        <span>Presupuesto para gastos<br><span class="meta">${state.expenseBudget>0 ? 'Comparado contra el período seleccionado arriba' : 'Aún no has definido un presupuesto'}</span></span>
+        <button class="icon-btn" onclick="openBudgetModal()" title="Editar presupuesto">${ICONS.edit}</button>
+      </div>
+      ${state.expenseBudget>0 ? `
+        <div class="budget-bar-track"><div class="budget-bar-fill" style="width:${budgetPct}%;background:${overBudget?'var(--coral)':'var(--tide)'};"></div></div>
+        <div class="muted" style="font-size:12.5px;margin-top:6px;">${money(expenseTotal)} de ${money(state.expenseBudget)}${overBudget ? ' · Te pasaste por '+money(expenseTotal-state.expenseBudget) : ' · Te quedan '+money(state.expenseBudget-expenseTotal)}</div>
+      ` : ''}
+    </div>
+    <div class="card">${expenseRows}</div>
+  `;
 }
 function setFinanceRange(id){ state.financeRange=id; renderMain(); }
 function openExpenseModal(){
@@ -627,6 +682,41 @@ async function deleteExpense(id){
   if(!confirm('¿Eliminar este gasto?')) return;
   const {error} = await supabaseClient.from('expenses').delete().eq('id', id);
   if(error) return alert('No se pudo eliminar: ' + error.message);
+  await loadAll();
+}
+function openBudgetModal(){
+  state.modalOpen = true;
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button><h3 class="display">Presupuesto para gastos</h3>
+      <p class="muted" style="margin-top:-6px;font-size:13px;">Es solo una referencia para avisarte cuando te estés pasando — no bloquea nada. Se compara contra el período que tengas seleccionado en Finanzas (Hoy, 7 días, etc.).</p>
+      <div class="field"><label>Monto del presupuesto (L)</label><input id="budgetAmount" type="number" step="0.01" min="0" value="${state.expenseBudget||''}"></div>
+      <button class="btn btn-primary btn-block" onclick="saveBudget()">Guardar presupuesto</button>
+    </div></div>`;
+}
+async function saveBudget(){
+  const amount = parseFloat(document.getElementById('budgetAmount').value);
+  if(isNaN(amount) || amount<0){ alert('Ingresa un monto válido.'); return; }
+  const {error} = await supabaseClient.from('settings').upsert({key:'expense_budget', amount, updated_at:new Date().toISOString()});
+  if(error) return alert('No se pudo guardar el presupuesto: ' + error.message);
+  closeModal(); setTab('finanzas'); await loadAll();
+}
+async function performDailyClosing(){
+  const todayStart = rangeStart('hoy');
+  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart);
+  const totalSales = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
+  const totalExpenses = state.expenses.filter(e=>e.date>=todayStart).reduce((s,e)=>s+e.amount,0);
+  if(todaysPaid.length===0){ alert('Todavía no hay ventas cobradas hoy.'); return; }
+  if(!confirm(`¿Cerrar el día con ${todaysPaid.length} venta(s) por un total de ${money(totalSales)}? Se guardará permanentemente en el historial de cierres y no se puede deshacer.`)) return;
+  const {error} = await supabaseClient.from('daily_closings').insert({
+    closing_date: new Date().toISOString().slice(0,10),
+    total_sales: totalSales,
+    total_expenses: totalExpenses,
+    order_count: todaysPaid.length,
+    closed_by: state.currentEmail || null,
+  });
+  if(error) return alert('No se pudo guardar el cierre: ' + error.message);
+  alert('Cierre del día guardado correctamente.');
   await loadAll();
 }
 async function deleteSale(id){
