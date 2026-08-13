@@ -235,6 +235,7 @@
 const SUPABASE_URL = 'https://tibfxqvtvneoifsipupj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_AETyIBVorZwzJ9URZrvcWw_QlD1NgaU';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const ADMIN_EMAILS = ['admin@bahiacatracha.com'];
 
 const ICONS = {
   pedidos:`<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 3v4h6V3"/><path d="M9 12h6M9 16h6"/></svg>`,
@@ -281,7 +282,7 @@ const state = {
   loaded:false, loadError:null,
   activeTab:'pedidos', orderFilter:'activos', financeRange:'hoy', historySearch:'',
   modalOpen:false, newOrderCart:{}, draftTable:'', draftCustomer:'',
-  busy:false,
+  busy:false, currentEmail:null, isAdmin:false,
 };
 
 /* ---------------- data layer (Supabase) ---------------- */
@@ -628,6 +629,20 @@ async function deleteExpense(id){
   if(error) return alert('No se pudo eliminar: ' + error.message);
   await loadAll();
 }
+async function deleteSale(id){
+  if(!state.isAdmin) return;
+  const o = state.orders.find(x=>x.id===id); if(!o) return;
+  if(!confirm('¿Eliminar esta venta por completo? Esta acción no se puede deshacer, se descontará de tus ingresos y se devolverá el inventario reservado.')) return;
+  for(const i of o.items){
+    const mi = state.menuItems.find(m=>m.id===i.itemId);
+    if(mi && typeof mi.stock==='number'){
+      await supabaseClient.from('menu_items').update({stock: mi.stock + i.qty}).eq('id', mi.id);
+    }
+  }
+  const {error} = await supabaseClient.from('orders').delete().eq('id', id);
+  if(error) return alert('No se pudo eliminar: ' + error.message);
+  await loadAll();
+}
 
 /* ============================================================ HISTORIAL ============================================================ */
 function renderHistorial(){
@@ -641,7 +656,9 @@ function renderHistorial(){
     const itemsText = o.items.map(i=>`${i.qty}× ${escapeHtml(i.name)}`).join(', ');
     return `<div class="card" style="margin-bottom:10px;"><div class="list-row" style="border:none;padding-top:0;">
       <span><strong>Mesa ${escapeHtml(o.table)}</strong> · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span>
-      <strong>${money(total)}</strong></div><div class="muted" style="font-size:12.5px;">${itemsText}</div></div>`;
+      <div style="display:flex;align-items:center;gap:8px;"><strong>${money(total)}</strong>
+      ${state.isAdmin ? `<button class="icon-btn" onclick="deleteSale('${o.id}')" title="Eliminar venta">${ICONS.trash}</button>` : ''}</div></div>
+      <div class="muted" style="font-size:12.5px;">${itemsText}</div></div>`;
   }).join('') : `<div class="empty"><p class="lead">Sin ventas registradas</p><p>Las ventas cobradas aparecerán aquí automáticamente.</p></div>`;
   return `
     <div class="stat-grid">
@@ -675,7 +692,9 @@ function showAuthGate(){
   document.getElementById('authGate').style.display='flex';
   document.getElementById('appShell').style.display='none';
 }
-function enterApp(){
+function enterApp(email){
+  state.currentEmail = email || null;
+  state.isAdmin = !!(email && ADMIN_EMAILS.includes(email.toLowerCase()));
   document.getElementById('authGate').style.display='none';
   document.getElementById('appShell').style.display='block';
   loadAll();
@@ -683,7 +702,7 @@ function enterApp(){
 }
 async function initAuth(){
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if(session){ enterApp(); } else { showAuthGate(); }
+  if(session){ enterApp(session.user.email); } else { showAuthGate(); }
   supabaseClient.auth.onAuthStateChange((event)=>{
     if(event==='SIGNED_OUT'){ location.reload(); }
   });
@@ -696,10 +715,10 @@ async function handleLogin(){
   errEl.style.display='none';
   if(!email || !password){ errEl.textContent='Ingresa tu correo y contraseña.'; errEl.style.display='block'; return; }
   btn.disabled = true; btn.textContent='Entrando…';
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   btn.disabled = false; btn.textContent='Iniciar sesión';
   if(error){ errEl.textContent = 'Correo o contraseña incorrectos.'; errEl.style.display='block'; return; }
-  enterApp();
+  enterApp(data.user ? data.user.email : email);
 }
 async function handleLogout(){
   if(!confirm('¿Cerrar sesión?')) return;
