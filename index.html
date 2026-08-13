@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --ink:#12262A;
@@ -47,69 +48,36 @@
   input,select,textarea{font-family:inherit;font-size:16px;}
   ::selection{background:var(--mango);color:#fff;}
 
-  /* ---------- header ---------- */
   header.top{
     background:var(--bay-deep);
     color:#fff;
     padding:18px 18px 26px;
     position:relative;
   }
-  header.top .row{
-    display:flex;justify-content:space-between;align-items:flex-start;
-  }
-  header.top .brand-eyebrow{
-    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-    color:#9FCFC9;font-weight:600;margin:0 0 2px;
-  }
-  header.top h1{
-    margin:0;font-size:25px;color:#fff;line-height:1.05;
-  }
-  header.top .sub{
-    margin:4px 0 0;color:#BFDEDA;font-size:13px;
-  }
-  .sync-pill{
-    display:flex;align-items:center;gap:6px;
-    background:rgba(255,255,255,0.08);
-    border:1px solid rgba(255,255,255,0.14);
-    border-radius:999px;padding:6px 10px;font-size:11.5px;color:#DDEFEC;
-    white-space:nowrap;
-  }
+  header.top .row{display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .brand-eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9FCFC9;font-weight:600;margin:0 0 2px;}
+  header.top h1{margin:0;font-size:25px;color:#fff;line-height:1.05;}
+  header.top .sub{margin:4px 0 0;color:#BFDEDA;font-size:13px;}
+  .sync-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:999px;padding:6px 10px;font-size:11.5px;color:#DDEFEC;white-space:nowrap;}
   .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--leaf);flex:none;}
   .sync-dot.busy{background:var(--mango);animation:pulse 1s ease-in-out infinite;}
+  .sync-dot.error{background:var(--coral);}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
   .wave-divider{display:block;width:100%;height:16px;position:absolute;left:0;bottom:-1px;}
 
-  /* ---------- tabs ---------- */
-  nav.tabbar{
-    position:fixed;left:0;right:0;bottom:0;
-    background:#fff;border-top:1px solid var(--line);
-    display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));
-    box-shadow:0 -6px 20px rgba(11,58,62,0.07);
-    z-index:40;
-  }
-  nav.tabbar button{
-    flex:1;background:none;border:none;display:flex;flex-direction:column;
-    align-items:center;gap:3px;padding:8px 2px 6px;color:var(--muted);
-    font-size:11px;font-weight:600;border-radius:12px;position:relative;
-  }
+  nav.tabbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(11,58,62,0.07);z-index:40;}
+  nav.tabbar button{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 6px;color:var(--muted);font-size:11px;font-weight:600;border-radius:12px;position:relative;}
   nav.tabbar button svg{width:22px;height:22px;stroke:var(--muted);fill:none;stroke-width:1.7;}
   nav.tabbar button.active{color:var(--tide);}
   nav.tabbar button.active svg{stroke:var(--tide);}
-  nav.tabbar button.active::before{
-    content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);
-    width:26px;height:3px;border-radius:3px;background:var(--mango);
-  }
+  nav.tabbar button.active::before{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:26px;height:3px;border-radius:3px;background:var(--mango);}
 
   main{max-width:640px;margin:0 auto;padding:16px 14px 24px;}
 
-  /* ---------- generic ---------- */
   .section-title{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 12px;}
   .section-title h2{font-size:19px;margin:0;}
   .muted{color:var(--muted);}
-  .btn{
-    border:none;border-radius:12px;padding:12px 16px;font-weight:600;font-size:14.5px;
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  }
+  .btn{border:none;border-radius:12px;padding:12px 16px;font-weight:600;font-size:14.5px;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
   .btn-primary{background:var(--mango);color:#fff;}
   .btn-primary:active{background:var(--mango-dark);}
   .btn-ghost{background:#fff;color:var(--bay-deep);border:1px solid var(--line);}
@@ -118,41 +86,27 @@
   .btn-block{width:100%;}
   .btn-sm{padding:8px 12px;font-size:13px;border-radius:9px;}
   .fab-new{width:100%;margin-bottom:14px;box-shadow:var(--shadow);}
+  .btn[disabled]{opacity:.5;pointer-events:none;}
 
   .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;}
-  .chip{
-    border:1px solid var(--line);background:#fff;color:var(--muted);
-    border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;white-space:nowrap;border:none;
-    box-shadow:0 1px 2px rgba(11,58,62,0.05);
-  }
+  .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;white-space:nowrap;border:none;box-shadow:0 1px 2px rgba(11,58,62,0.05);}
   .chip.active{background:var(--bay-deep);color:#fff;}
 
   .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 15px;margin-bottom:12px;}
-  .empty{
-    text-align:center;padding:44px 18px;color:var(--muted);
-  }
+  .empty{text-align:center;padding:44px 18px;color:var(--muted);}
   .empty svg{width:40px;height:40px;stroke:var(--tide);opacity:.6;margin-bottom:10px;}
   .empty p{margin:2px 0;font-size:14px;}
   .empty .lead{color:var(--ink);font-weight:600;font-size:15px;}
 
-  /* order card */
-  .order-card{
-    background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);
-    margin-bottom:12px;overflow:hidden;display:flex;
-  }
+  .order-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;display:flex;}
   .order-card .stripe{width:6px;flex:none;}
   .order-card.pendiente .stripe{background:var(--mango);}
   .order-card.entregado .stripe{background:var(--tide);}
   .order-card .body{padding:13px 14px;flex:1;min-width:0;}
   .order-card .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-  .order-card .table-tag{
-    font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--bay-deep);
-  }
+  .order-card .table-tag{font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--bay-deep);}
   .order-card .customer{font-size:13px;color:var(--muted);margin-top:1px;}
-  .order-card .status-badge{
-    font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-    padding:4px 9px;border-radius:999px;white-space:nowrap;
-  }
+  .order-card .status-badge{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;white-space:nowrap;}
   .order-card.pendiente .status-badge{background:#FDEEE0;color:var(--mango-dark);}
   .order-card.entregado .status-badge{background:var(--tide-light);color:var(--tide);}
   .order-card .items{font-size:13.5px;color:var(--ink);margin:9px 0;line-height:1.5;}
@@ -162,16 +116,9 @@
   .order-card .actions{display:flex;gap:8px;margin-top:10px;}
   .order-card .actions .btn{flex:1;}
 
-  /* menu items */
-  .cat-heading{
-    font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--tide);margin:20px 2px 8px;
-  }
+  .cat-heading{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tide);margin:20px 2px 8px;}
   .cat-heading:first-child{margin-top:2px;}
-  .menu-row{
-    background:#fff;border-radius:var(--radius-sm);box-shadow:var(--shadow);
-    padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px;
-  }
+  .menu-row{background:#fff;border-radius:var(--radius-sm);box-shadow:var(--shadow);padding:11px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px;}
   .menu-row .info{flex:1;min-width:0;}
   .menu-row .name{font-weight:600;font-size:14.5px;}
   .menu-row .price{color:var(--muted);font-size:13px;margin-top:1px;}
@@ -179,13 +126,9 @@
   .stock-ok{background:var(--leaf-light);color:var(--leaf);}
   .stock-low{background:var(--coral-light);color:var(--coral);}
   .stock-none{background:#EFEAE0;color:var(--muted);}
-  .menu-row .icon-btn{
-    background:var(--sand);border:none;border-radius:8px;width:30px;height:30px;
-    display:flex;align-items:center;justify-content:center;flex:none;
-  }
+  .menu-row .icon-btn{background:var(--sand);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;}
   .menu-row .icon-btn svg{width:15px;height:15px;stroke:var(--bay-deep);fill:none;stroke-width:2;}
 
-  /* finance */
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .stat-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;grid-column:span 1;}
   .stat-card.wide{grid-column:span 2;}
@@ -195,95 +138,103 @@
   .stat-card.expense .value{color:var(--coral);}
   .stat-card.balance-pos .value{color:var(--tide);}
   .stat-card.balance-neg .value{color:var(--coral);}
-  .list-row{
-    display:flex;justify-content:space-between;align-items:center;
-    padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px;gap:10px;
-  }
+  .list-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px;gap:10px;}
   .list-row:last-child{border-bottom:none;}
   .list-row .meta{color:var(--muted);font-size:12px;}
 
-  /* modal */
-  .overlay{
-    position:fixed;inset:0;background:rgba(11,38,42,0.45);z-index:60;
-    display:flex;align-items:flex-end;justify-content:center;
-  }
-  .modal{
-    background:#fff;width:100%;max-width:640px;border-radius:20px 20px 0 0;
-    max-height:92vh;overflow-y:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom));
-    animation:slideUp .18s ease-out;
-  }
+  .overlay{position:fixed;inset:0;background:rgba(11,38,42,0.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+  .modal{background:#fff;width:100%;max-width:640px;border-radius:20px 20px 0 0;max-height:92vh;overflow-y:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom));animation:slideUp .18s ease-out;}
   @keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
   .modal h3{margin:0 0 14px;font-size:18px;}
   .field{margin-bottom:12px;}
   .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px;}
-  .field input,.field select,.field textarea{
-    width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--sand);color:var(--ink);
-  }
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--sand);color:var(--ink);}
   .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--tide);outline-offset:1px;}
-  .modal-close{
-    position:absolute;top:14px;right:14px;background:var(--sand);border:none;border-radius:50%;
-    width:32px;height:32px;display:flex;align-items:center;justify-content:center;
-  }
+  .modal-close{position:absolute;top:14px;right:14px;background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;}
   .modal-wrap{position:relative;}
-  .picker-item{
-    display:flex;align-items:center;justify-content:space-between;padding:10px 0;
-    border-bottom:1px solid var(--line);
-  }
+  .picker-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);}
   .picker-item:last-child{border-bottom:none;}
   .picker-item .p-name{font-size:14px;font-weight:600;}
   .picker-item .p-price{font-size:12px;color:var(--muted);}
   .qty-stepper{display:flex;align-items:center;gap:10px;}
-  .qty-stepper button{
-    width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--sand);
-    font-size:16px;font-weight:700;color:var(--bay-deep);display:flex;align-items:center;justify-content:center;
-  }
+  .qty-stepper button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--sand);font-size:16px;font-weight:700;color:var(--bay-deep);display:flex;align-items:center;justify-content:center;}
   .qty-stepper span{min-width:16px;text-align:center;font-weight:700;}
-  .cart-bar{
-    position:sticky;bottom:-18px;background:#fff;border-top:1px solid var(--line);
-    margin:14px -18px -18px;padding:14px 18px calc(14px + env(safe-area-inset-bottom));
-    display:flex;align-items:center;justify-content:space-between;gap:12px;
-  }
+  .cart-bar{position:sticky;bottom:-18px;background:#fff;border-top:1px solid var(--line);margin:14px -18px -18px;padding:14px 18px calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .cart-bar .sub{font-size:13px;color:var(--muted);}
   .cart-bar .amt{font-family:'Fraunces',serif;font-weight:700;font-size:19px;}
+  .banner-error{background:var(--coral-light);color:var(--coral);border-radius:12px;padding:12px 14px;font-size:13.5px;margin-bottom:14px;}
 
   @media(min-width:640px){
     main{padding:22px 0 30px;}
     nav.tabbar{max-width:640px;left:50%;transform:translateX(-50%);border-radius:20px 20px 0 0;}
   }
+
+  /* ---------- acceso ---------- */
+  .auth-screen{
+    display:flex;align-items:center;justify-content:center;min-height:100vh;
+    background:var(--bay-deep);padding:24px;
+  }
+  .auth-card{
+    background:#fff;border-radius:20px;box-shadow:var(--shadow);
+    padding:28px 24px;width:100%;max-width:380px;
+  }
+  .logout-btn{
+    background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.16);
+    color:#fff;border-radius:10px;width:34px;height:34px;font-size:15px;
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
 </style>
 </head>
 <body>
 
-<header class="top">
-  <div class="row">
-    <div>
-      <p class="brand-eyebrow">Panel de operaciones</p>
-      <h1 class="display">Bahía Catracha</h1>
-      <p class="sub">Pedidos · Inventario · Finanzas</p>
-    </div>
-    <div class="sync-pill" id="syncPill">
-      <span class="sync-dot" id="syncDot"></span>
-      <span id="syncText">Sincronizando…</span>
-    </div>
+<div id="authGate" class="auth-screen">
+  <div class="auth-card">
+    <p class="brand-eyebrow" style="color:var(--tide);">Bahía Catracha</p>
+    <h1 class="display" style="margin:0 0 4px;font-size:22px;">Acceso del personal</h1>
+    <p class="muted" style="margin:0 0 20px;font-size:13.5px;">Ingresa con la cuenta que te dio el administrador.</p>
+    <div class="field"><label>Correo</label><input id="authEmail" type="email" placeholder="mesero@bahiacatracha.com" autocomplete="username"></div>
+    <div class="field"><label>Contraseña</label><input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password" onkeypress="if(event.key==='Enter') handleLogin()"></div>
+    <div id="authError" class="banner-error" style="display:none;"></div>
+    <button class="btn btn-primary btn-block" id="authSubmitBtn" onclick="handleLogin()">Iniciar sesión</button>
   </div>
-  <svg class="wave-divider" viewBox="0 0 400 16" preserveAspectRatio="none">
-    <path d="M0,8 C50,16 100,0 150,8 C200,16 250,0 300,8 C350,16 400,0 400,8 L400,16 L0,16 Z" fill="#FAF4E7"/>
-  </svg>
-</header>
+</div>
 
-<main id="main"></main>
+<div id="appShell" style="display:none;">
+  <header class="top">
+    <div class="row">
+      <div>
+        <p class="brand-eyebrow">Panel de operaciones</p>
+        <h1 class="display">Bahía Catracha</h1>
+        <p class="sub">Pedidos · Inventario · Finanzas</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="sync-pill" id="syncPill">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncText">Conectando…</span>
+        </div>
+        <button class="logout-btn" onclick="handleLogout()" title="Cerrar sesión">⏻</button>
+      </div>
+    </div>
+    <svg class="wave-divider" viewBox="0 0 400 16" preserveAspectRatio="none">
+      <path d="M0,8 C50,16 100,0 150,8 C200,16 250,0 300,8 C350,16 400,0 400,8 L400,16 L0,16 Z" fill="#FAF4E7"/>
+    </svg>
+  </header>
 
-<nav class="tabbar" id="tabbar"></nav>
-
-<div id="modalRoot"></div>
+  <main id="main"></main>
+  <nav class="tabbar" id="tabbar"></nav>
+  <div id="modalRoot"></div>
+</div>
 
 <script>
 /* ============================================================
    BAHÍA CATRACHA — panel de operaciones
-   Datos compartidos entre todos los dispositivos vía window.storage
+   Conectado a Supabase: todos los dispositivos leen/escriben
+   la misma base de datos en la nube, en tiempo real.
    ============================================================ */
 
-const STORAGE_KEY = 'bahia-catracha:db';
+const SUPABASE_URL = 'https://tibfxqvtvneoifsipupj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_AETyIBVorZwzJ9URZrvcWw_QlD1NgaU';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ICONS = {
   pedidos:`<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 3v4h6V3"/><path d="M9 12h6M9 16h6"/></svg>`,
@@ -302,29 +253,8 @@ const TABS = [
   {id:'finanzas', label:'Finanzas', icon:ICONS.finanzas},
   {id:'historial', label:'Historial', icon:ICONS.historial},
 ];
-
 const CATEGORIES = ['Entradas','Platos Fuertes','Mariscos','Bebidas','Postres'];
 
-function seedMenu(){
-  return [
-    {id:uid(),name:'Ceviche de caracol',category:'Entradas',price:165,stock:14},
-    {id:uid(),name:'Sopa de caracol',category:'Entradas',price:190,stock:10},
-    {id:uid(),name:'Tapado costeño',category:'Platos Fuertes',price:245,stock:8},
-    {id:uid(),name:'Pescado frito entero',category:'Mariscos',price:280,stock:12},
-    {id:uid(),name:'Camarones al ajillo',category:'Mariscos',price:260,stock:9},
-    {id:uid(),name:'Machuca con pescado',category:'Platos Fuertes',price:230,stock:7},
-    {id:uid(),name:'Baleada especial',category:'Platos Fuertes',price:95,stock:20},
-    {id:uid(),name:'Pan de coco',category:'Postres',price:40,stock:25},
-    {id:uid(),name:'Agua de coco',category:'Bebidas',price:55,stock:18},
-    {id:uid(),name:'Licuado de banano',category:'Bebidas',price:60,stock:15},
-    {id:uid(),name:'Horchata',category:'Bebidas',price:45,stock:20},
-    {id:uid(),name:'Cerveza Salva Vida',category:'Bebidas',price:70,stock:24},
-  ];
-}
-
-function uid(){
-  return (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2));
-}
 function money(n){
   const v = Number(n)||0;
   return 'L ' + v.toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -347,131 +277,113 @@ function escapeHtml(s){
 
 /* ---------------- state ---------------- */
 const state = {
-  menuItems:[],
-  orders:[],
-  expenses:[],
-  loaded:false,
-  activeTab:'pedidos',
-  orderFilter:'activos',
-  financeRange:'hoy',
-  historySearch:'',
-  modalOpen:false,
-  newOrderCart:{}, // itemId -> qty
-  syncing:false,
+  menuItems:[], orders:[], expenses:[],
+  loaded:false, loadError:null,
+  activeTab:'pedidos', orderFilter:'activos', financeRange:'hoy', historySearch:'',
+  modalOpen:false, newOrderCart:{}, draftTable:'', draftCustomer:'',
+  busy:false,
 };
 
-/* ---------------- storage ---------------- */
-async function loadDB(silent){
-  if(!silent){ setSyncing(true); }
-  try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    const data = JSON.parse(res.value);
-    state.menuItems = data.menuItems || [];
-    state.orders = data.orders || [];
-    state.expenses = data.expenses || [];
-  }catch(e){
-    // no existe todavía: sembrar datos iniciales
-    state.menuItems = seedMenu();
-    state.orders = [];
-    state.expenses = [];
-    await saveDB();
+/* ---------------- data layer (Supabase) ---------------- */
+function mapOrder(row){
+  return {
+    id:row.id, table:row.table_number, customer:row.customer_name,
+    items:row.items || [], status:row.status,
+    createdAt:new Date(row.created_at).getTime(),
+    paidAt: row.paid_at ? new Date(row.paid_at).getTime() : null,
+  };
+}
+function mapExpense(row){
+  return { id:row.id, description:row.description, category:row.category, amount:Number(row.amount), date:new Date(row.date).getTime() };
+}
+
+async function loadAll(){
+  setSyncing(true);
+  const [miRes, ordRes, expRes] = await Promise.all([
+    supabaseClient.from('menu_items').select('*').order('created_at', {ascending:true}),
+    supabaseClient.from('orders').select('*').order('created_at', {ascending:false}),
+    supabaseClient.from('expenses').select('*').order('date', {ascending:false}),
+  ]);
+  if(miRes.error || ordRes.error || expRes.error){
+    state.loadError = (miRes.error||ordRes.error||expRes.error).message;
+    setSyncing(false, false, true);
+    state.loaded = true;
+    renderAll();
+    return;
   }
+  state.loadError = null;
+  state.menuItems = miRes.data.map(r => ({ id:r.id, name:r.name, category:r.category, price:Number(r.price), stock: r.stock===null? undefined : r.stock }));
+  state.orders = ordRes.data.map(mapOrder);
+  state.expenses = expRes.data.map(mapExpense);
   state.loaded = true;
   setSyncing(false, true);
   renderAll();
 }
 
-async function saveDB(){
-  setSyncing(true);
-  try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify({
-      menuItems: state.menuItems,
-      orders: state.orders,
-      expenses: state.expenses,
-    }), true);
-  }catch(e){
-    console.error('Error guardando datos', e);
-    alert('No se pudo guardar el cambio. Revisa tu conexión e inténtalo de nuevo.');
-  }
-  setSyncing(false, true);
-}
-
 let lastSyncAt = null;
-function setSyncing(on, updateStamp){
-  state.syncing = on;
+function setSyncing(on, updateStamp, hadError){
+  state.busy = on;
   if(updateStamp) lastSyncAt = Date.now();
   const dot = document.getElementById('syncDot');
   const txt = document.getElementById('syncText');
   if(!dot) return;
   dot.classList.toggle('busy', on);
+  dot.classList.toggle('error', !!hadError);
+  if(hadError){ txt.textContent = 'Sin conexión a la base de datos'; return; }
   txt.textContent = on ? 'Sincronizando…' : (lastSyncAt ? 'Al día · ' + new Date(lastSyncAt).toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'}) : 'Al día');
 }
 
-// Sondeo periódico para reflejar cambios hechos desde otros teléfonos
-setInterval(()=>{ if(!state.modalOpen) loadDB(true); }, 12000);
+// Sincronización en tiempo real: cuando cualquier teléfono cambia algo, todos se actualizan al instante
+function setupRealtime(){
+  supabaseClient.channel('bahia-catracha-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'orders'}, onRemoteChange)
+    .on('postgres_changes', {event:'*', schema:'public', table:'menu_items'}, onRemoteChange)
+    .on('postgres_changes', {event:'*', schema:'public', table:'expenses'}, onRemoteChange)
+    .subscribe();
+}
+function onRemoteChange(){
+  if(!state.modalOpen) loadAll();
+}
+// Respaldo por si el tiempo real no está habilitado en el proyecto
+setInterval(()=>{ if(!state.modalOpen) loadAll(); }, 20000);
 
 /* ---------------- render root ---------------- */
-function renderAll(){
-  renderTabbar();
-  renderMain();
-}
-
+function renderAll(){ renderTabbar(); renderMain(); }
 function renderTabbar(){
-  const el = document.getElementById('tabbar');
-  el.innerHTML = TABS.map(t => `
+  document.getElementById('tabbar').innerHTML = TABS.map(t => `
     <button class="${state.activeTab===t.id?'active':''}" onclick="setTab('${t.id}')">
-      ${t.icon}
-      <span>${t.label}</span>
-    </button>
-  `).join('');
+      ${t.icon}<span>${t.label}</span>
+    </button>`).join('');
 }
-
-function setTab(id){
-  state.activeTab = id;
-  renderTabbar();
-  renderMain();
-}
+function setTab(id){ state.activeTab = id; renderTabbar(); renderMain(); }
 
 function renderMain(){
   const el = document.getElementById('main');
-  if(!state.loaded){
-    el.innerHTML = `<div class="empty"><p class="lead">Cargando datos…</p></div>`;
-    return;
-  }
-  if(state.activeTab==='pedidos') return el.innerHTML = renderPedidos();
-  if(state.activeTab==='menu') return el.innerHTML = renderMenu();
-  if(state.activeTab==='finanzas') return el.innerHTML = renderFinanzas();
-  if(state.activeTab==='historial') return el.innerHTML = renderHistorial();
+  if(!state.loaded){ el.innerHTML = `<div class="empty"><p class="lead">Cargando datos…</p></div>`; return; }
+  const errorBanner = state.loadError ? `<div class="banner-error">No se pudo conectar con la base de datos: ${escapeHtml(state.loadError)}</div>` : '';
+  if(state.activeTab==='pedidos') return el.innerHTML = errorBanner + renderPedidos();
+  if(state.activeTab==='menu') return el.innerHTML = errorBanner + renderMenu();
+  if(state.activeTab==='finanzas') return el.innerHTML = errorBanner + renderFinanzas();
+  if(state.activeTab==='historial') return el.innerHTML = errorBanner + renderHistorial();
 }
 
-/* ============================================================
-   PEDIDOS
-   ============================================================ */
+/* ============================================================ PEDIDOS ============================================================ */
 function renderPedidos(){
   const active = state.orders.filter(o => o.status==='pendiente' || o.status==='entregado');
   const filtered = active.filter(o => state.orderFilter==='activos' ? true : o.status===state.orderFilter)
                           .sort((a,b)=> a.status===b.status ? b.createdAt-a.createdAt : (a.status==='pendiente'?-1:1));
-
   const chips = [
     {id:'activos', label:`Todos (${active.length})`},
     {id:'pendiente', label:`Pendientes (${active.filter(o=>o.status==='pendiente').length})`},
     {id:'entregado', label:`Entregados (${active.filter(o=>o.status==='entregado').length})`},
   ].map(c=>`<button class="chip ${state.orderFilter===c.id?'active':''}" onclick="setOrderFilter('${c.id}')">${c.label}</button>`).join('');
-
   const cards = filtered.length ? filtered.map(orderCardHtml).join('') : `
-    <div class="empty">
-      ${ICONS.wave.replace('<svg','<svg stroke="currentColor" fill="none" stroke-width="2"')}
-      <p class="lead">Aún no hay pedidos aquí</p>
-      <p>Toca «Nuevo pedido» para registrar el primero.</p>
-    </div>`;
-
+    <div class="empty">${ICONS.wave.replace('<svg','<svg stroke="currentColor" fill="none" stroke-width="2"')}
+      <p class="lead">Aún no hay pedidos aquí</p><p>Toca «Nuevo pedido» para registrar el primero.</p></div>`;
   return `
     <button class="btn btn-primary btn-block fab-new" onclick="openNewOrderModal()">${ICONS.plus} Nuevo pedido</button>
-    <div class="chips">${chips}</div>
-    ${cards}
-  `;
+    <div class="chips">${chips}</div>${cards}`;
 }
-
 function orderCardHtml(o){
   const itemsText = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(', ');
   const total = o.items.reduce((s,i)=> s + i.qty*i.price, 0);
@@ -479,123 +391,72 @@ function orderCardHtml(o){
     ? `<button class="btn btn-tide" onclick="markDelivered('${o.id}')">Marcar entregado</button>`
     : `<button class="btn btn-primary" onclick="markPaid('${o.id}')">Cobrar</button>`;
   return `
-    <div class="order-card ${o.status}">
-      <div class="stripe"></div>
-      <div class="body">
-        <div class="head">
-          <div>
-            <div class="table-tag">Mesa ${escapeHtml(o.table)}</div>
-            <div class="customer">${escapeHtml(o.customer)}</div>
-          </div>
-          <span class="status-badge">${o.status}</span>
-        </div>
-        <div class="items">${itemsText}</div>
-        <div class="foot">
-          <span class="total">${money(total)}</span>
-          <span class="time">${timeAgo(o.createdAt)}</span>
-        </div>
-        <div class="actions">
-          ${nextBtn}
-          <button class="btn btn-danger" onclick="cancelOrder('${o.id}')">Cancelar</button>
-        </div>
-      </div>
-    </div>
-  `;
+    <div class="order-card ${o.status}"><div class="stripe"></div><div class="body">
+      <div class="head"><div><div class="table-tag">Mesa ${escapeHtml(o.table)}</div><div class="customer">${escapeHtml(o.customer)}</div></div>
+      <span class="status-badge">${o.status}</span></div>
+      <div class="items">${itemsText}</div>
+      <div class="foot"><span class="total">${money(total)}</span><span class="time">${timeAgo(o.createdAt)}</span></div>
+      <div class="actions">${nextBtn}<button class="btn btn-danger" onclick="cancelOrder('${o.id}')">Cancelar</button></div>
+    </div></div>`;
 }
-
 function setOrderFilter(id){ state.orderFilter=id; renderMain(); }
 
 async function markDelivered(id){
-  const o = state.orders.find(x=>x.id===id); if(!o) return;
-  o.status='entregado';
-  renderMain();
-  await saveDB();
+  const {error} = await supabaseClient.from('orders').update({status:'entregado'}).eq('id', id);
+  if(error) return alert('No se pudo actualizar: ' + error.message);
+  await loadAll();
 }
 async function markPaid(id){
-  const o = state.orders.find(x=>x.id===id); if(!o) return;
-  o.status='pagado'; o.paidAt=Date.now();
-  renderMain();
-  await saveDB();
+  const {error} = await supabaseClient.from('orders').update({status:'pagado', paid_at:new Date().toISOString()}).eq('id', id);
+  if(error) return alert('No se pudo cobrar el pedido: ' + error.message);
+  await loadAll();
 }
 async function cancelOrder(id){
-  const idx = state.orders.findIndex(x=>x.id===id); if(idx===-1) return;
+  const o = state.orders.find(x=>x.id===id); if(!o) return;
   if(!confirm('¿Cancelar este pedido? El inventario reservado se devolverá.')) return;
-  const o = state.orders[idx];
-  o.items.forEach(i=>{
+  for(const i of o.items){
     const mi = state.menuItems.find(m=>m.id===i.itemId);
-    if(mi && typeof mi.stock==='number') mi.stock += i.qty;
-  });
-  state.orders.splice(idx,1);
-  renderMain();
-  await saveDB();
+    if(mi && typeof mi.stock==='number'){
+      await supabaseClient.from('menu_items').update({stock: mi.stock + i.qty}).eq('id', mi.id);
+    }
+  }
+  const {error} = await supabaseClient.from('orders').delete().eq('id', id);
+  if(error) return alert('No se pudo cancelar: ' + error.message);
+  await loadAll();
 }
 
 /* --- nuevo pedido --- */
-function openNewOrderModal(){
-  state.modalOpen = true;
-  state.newOrderCart = {};
-  renderNewOrderModal();
-}
+function openNewOrderModal(){ state.modalOpen = true; state.newOrderCart = {}; renderNewOrderModal(); }
 function renderNewOrderModal(){
   const byCat = {};
   state.menuItems.forEach(i=>{ (byCat[i.category] ||= []).push(i); });
-
   const picker = Object.keys(byCat).map(cat => `
     <div class="cat-heading">${escapeHtml(cat)}</div>
     ${byCat[cat].map(i => {
       const qty = state.newOrderCart[i.id]||0;
       const outOfStock = typeof i.stock==='number' && i.stock<=0 && qty<=0;
-      return `
-        <div class="picker-item">
-          <div>
-            <div class="p-name">${escapeHtml(i.name)}</div>
-            <div class="p-price">${money(i.price)}${typeof i.stock==='number' ? ' · '+i.stock+' disp.' : ''}</div>
-          </div>
-          <div class="qty-stepper">
-            <button ${qty<=0?'disabled style="opacity:.4"':''} onclick="cartQty('${i.id}',-1)">–</button>
-            <span>${qty}</span>
-            <button ${outOfStock?'disabled style="opacity:.4"':''} onclick="cartQty('${i.id}',1)">+</button>
-          </div>
-        </div>`;
-    }).join('')}
-  `).join('');
-
+      return `<div class="picker-item"><div><div class="p-name">${escapeHtml(i.name)}</div>
+        <div class="p-price">${money(i.price)}${typeof i.stock==='number' ? ' · '+i.stock+' disp.' : ''}</div></div>
+        <div class="qty-stepper"><button ${qty<=0?'disabled':''} onclick="cartQty('${i.id}',-1)">–</button>
+        <span>${qty}</span><button ${outOfStock?'disabled':''} onclick="cartQty('${i.id}',1)">+</button></div></div>`;
+    }).join('')}`).join('');
   const subtotal = Object.entries(state.newOrderCart).reduce((s,[id,qty])=>{
-    const mi = state.menuItems.find(m=>m.id===id);
-    return s + (mi? mi.price*qty : 0);
+    const mi = state.menuItems.find(m=>m.id===id); return s + (mi? mi.price*qty : 0);
   },0);
   const itemCount = Object.values(state.newOrderCart).reduce((a,b)=>a+b,0);
-
   document.getElementById('modalRoot').innerHTML = `
-    <div class="overlay" onclick="if(event.target===this) closeModal()">
-      <div class="modal modal-wrap">
-        <button class="modal-close" onclick="closeModal()">✕</button>
-        <h3 class="display">Nuevo pedido</h3>
-        <div class="field">
-          <label>Número de mesa</label>
-          <input id="ordTable" type="text" inputmode="numeric" placeholder="Ej. 5" value="${state.draftTable||''}">
-        </div>
-        <div class="field">
-          <label>Nombre del cliente</label>
-          <input id="ordCustomer" type="text" placeholder="Ej. Carlos Mejía" value="${state.draftCustomer||''}">
-        </div>
-        <div class="field">
-          <label>Selecciona los productos</label>
-          ${state.menuItems.length ? picker : '<p class="muted">Agrega productos en la pestaña Menú primero.</p>'}
-        </div>
-        <div class="cart-bar">
-          <div>
-            <div class="sub">${itemCount} artículo${itemCount===1?'':'s'}</div>
-            <div class="amt">${money(subtotal)}</div>
-          </div>
-          <button class="btn btn-primary" onclick="submitNewOrder()">Crear pedido</button>
-        </div>
-      </div>
-    </div>
-  `;
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h3 class="display">Nuevo pedido</h3>
+      <div class="field"><label>Número de mesa</label><input id="ordTable" type="text" inputmode="numeric" placeholder="Ej. 5" value="${escapeHtml(state.draftTable||'')}"></div>
+      <div class="field"><label>Nombre del cliente</label><input id="ordCustomer" type="text" placeholder="Ej. Carlos Mejía" value="${escapeHtml(state.draftCustomer||'')}"></div>
+      <div class="field"><label>Selecciona los productos</label>
+        ${state.menuItems.length ? picker : '<p class="muted">Agrega productos en la pestaña Menú primero.</p>'}</div>
+      <div class="cart-bar"><div><div class="sub">${itemCount} artículo${itemCount===1?'':'s'}</div><div class="amt">${money(subtotal)}</div></div>
+      <button class="btn btn-primary" ${state.busy?'disabled':''} onclick="submitNewOrder()">Crear pedido</button></div>
+    </div></div>`;
 }
 function cartQty(itemId, delta){
-  // preservar los campos ya escritos
   state.draftTable = document.getElementById('ordTable') ? document.getElementById('ordTable').value : state.draftTable;
   state.draftCustomer = document.getElementById('ordCustomer') ? document.getElementById('ordCustomer').value : state.draftCustomer;
   const cur = state.newOrderCart[itemId]||0;
@@ -610,70 +471,46 @@ async function submitNewOrder(){
   if(!table){ alert('Ingresa el número de mesa.'); return; }
   if(!customer){ alert('Ingresa el nombre del cliente.'); return; }
   if(!cartEntries.length){ alert('Agrega al menos un producto.'); return; }
-
   const items = cartEntries.map(([id,qty])=>{
     const mi = state.menuItems.find(m=>m.id===id);
     return {itemId:id, name:mi.name, price:mi.price, qty};
   });
-  items.forEach(i=>{
+  state.busy = true;
+  const {error} = await supabaseClient.from('orders').insert({
+    table_number: table, customer_name: customer, items, status:'pendiente'
+  });
+  if(error){ state.busy=false; alert('No se pudo crear el pedido: ' + error.message); return; }
+  for(const i of items){
     const mi = state.menuItems.find(m=>m.id===i.itemId);
-    if(mi && typeof mi.stock==='number') mi.stock = Math.max(0, mi.stock - i.qty);
-  });
-  state.orders.push({
-    id:uid(), table, customer, items, status:'pendiente', createdAt:Date.now(), paidAt:null,
-  });
-  state.draftTable=''; state.draftCustomer='';
-  closeModal();
-  setTab('pedidos');
-  await saveDB();
+    if(mi && typeof mi.stock==='number'){
+      await supabaseClient.from('menu_items').update({stock: Math.max(0, mi.stock - i.qty)}).eq('id', mi.id);
+    }
+  }
+  state.draftTable=''; state.draftCustomer=''; state.busy=false;
+  closeModal(); setTab('pedidos'); await loadAll();
 }
+function closeModal(){ state.modalOpen=false; document.getElementById('modalRoot').innerHTML=''; }
 
-function closeModal(){
-  state.modalOpen=false;
-  document.getElementById('modalRoot').innerHTML='';
-}
-
-/* ============================================================
-   MENÚ / INVENTARIO
-   ============================================================ */
+/* ============================================================ MENÚ / INVENTARIO ============================================================ */
 function renderMenu(){
   const byCat = {};
   state.menuItems.forEach(i=>{ (byCat[i.category] ||= []).push(i); });
   const cats = Object.keys(byCat).sort((a,b)=> CATEGORIES.indexOf(a)-CATEGORIES.indexOf(b));
-
   const body = state.menuItems.length ? cats.map(cat => `
-    <div class="cat-heading">${escapeHtml(cat)}</div>
-    ${byCat[cat].map(menuRowHtml).join('')}
-  `).join('') : `
-    <div class="empty">
-      <p class="lead">Todavía no hay productos</p>
-      <p>Agrega tu primer plato o bebida al menú.</p>
-    </div>`;
-
-  return `
-    <button class="btn btn-primary btn-block fab-new" onclick="openItemModal()">${ICONS.plus} Nuevo producto</button>
-    ${body}
-  `;
+    <div class="cat-heading">${escapeHtml(cat)}</div>${byCat[cat].map(menuRowHtml).join('')}`).join('') : `
+    <div class="empty"><p class="lead">Todavía no hay productos</p><p>Agrega tu primer plato o bebida al menú.</p></div>`;
+  return `<button class="btn btn-primary btn-block fab-new" onclick="openItemModal()">${ICONS.plus} Nuevo producto</button>${body}`;
 }
 function menuRowHtml(i){
   let badge = `<span class="stock-badge stock-none">Sin control</span>`;
   if(typeof i.stock==='number'){
-    badge = i.stock<=5
-      ? `<span class="stock-badge stock-low">${i.stock} disp.</span>`
-      : `<span class="stock-badge stock-ok">${i.stock} disp.</span>`;
+    badge = i.stock<=5 ? `<span class="stock-badge stock-low">${i.stock} disp.</span>` : `<span class="stock-badge stock-ok">${i.stock} disp.</span>`;
   }
-  return `
-    <div class="menu-row">
-      <div class="info">
-        <div class="name">${escapeHtml(i.name)}</div>
-        <div class="price">${money(i.price)}</div>
-      </div>
-      ${badge}
-      <button class="icon-btn" onclick="quickRestock('${i.id}')" title="Reabastecer">${ICONS.plus}</button>
-      <button class="icon-btn" onclick="openItemModal('${i.id}')" title="Editar">${ICONS.edit}</button>
-      <button class="icon-btn" onclick="deleteItem('${i.id}')" title="Eliminar">${ICONS.trash}</button>
-    </div>
-  `;
+  return `<div class="menu-row"><div class="info"><div class="name">${escapeHtml(i.name)}</div><div class="price">${money(i.price)}</div></div>
+    ${badge}
+    <button class="icon-btn" onclick="quickRestock('${i.id}')" title="Reabastecer">${ICONS.plus}</button>
+    <button class="icon-btn" onclick="openItemModal('${i.id}')" title="Editar">${ICONS.edit}</button>
+    <button class="icon-btn" onclick="deleteItem('${i.id}')" title="Eliminar">${ICONS.trash}</button></div>`;
 }
 async function quickRestock(id){
   const mi = state.menuItems.find(m=>m.id===id); if(!mi) return;
@@ -681,47 +518,31 @@ async function quickRestock(id){
   if(amt===null) return;
   const n = parseInt(amt,10);
   if(isNaN(n) || n<=0) return;
-  mi.stock = (typeof mi.stock==='number'? mi.stock : 0) + n;
-  renderMain();
-  await saveDB();
+  const newStock = (typeof mi.stock==='number'? mi.stock : 0) + n;
+  const {error} = await supabaseClient.from('menu_items').update({stock:newStock}).eq('id', id);
+  if(error) return alert('No se pudo actualizar: ' + error.message);
+  await loadAll();
 }
 async function deleteItem(id){
   const mi = state.menuItems.find(m=>m.id===id); if(!mi) return;
   if(!confirm(`¿Eliminar "${mi.name}" del menú? Esto no afecta pedidos ya registrados.`)) return;
-  state.menuItems = state.menuItems.filter(m=>m.id!==id);
-  renderMain();
-  await saveDB();
+  const {error} = await supabaseClient.from('menu_items').delete().eq('id', id);
+  if(error) return alert('No se pudo eliminar: ' + error.message);
+  await loadAll();
 }
 function openItemModal(id){
   state.modalOpen = true;
   const editing = id ? state.menuItems.find(m=>m.id===id) : null;
   document.getElementById('modalRoot').innerHTML = `
-    <div class="overlay" onclick="if(event.target===this) closeModal()">
-      <div class="modal modal-wrap">
-        <button class="modal-close" onclick="closeModal()">✕</button>
-        <h3 class="display">${editing?'Editar producto':'Nuevo producto'}</h3>
-        <div class="field">
-          <label>Nombre</label>
-          <input id="itName" type="text" placeholder="Ej. Ceviche de camarón" value="${editing?escapeHtml(editing.name):''}">
-        </div>
-        <div class="field">
-          <label>Categoría</label>
-          <select id="itCat">
-            ${CATEGORIES.map(c=>`<option ${editing&&editing.category===c?'selected':''}>${c}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field">
-          <label>Precio (L)</label>
-          <input id="itPrice" type="number" step="0.01" min="0" value="${editing?editing.price:''}">
-        </div>
-        <div class="field">
-          <label>Stock inicial (déjalo vacío si no quieres controlar existencias)</label>
-          <input id="itStock" type="number" min="0" value="${editing && typeof editing.stock==='number'?editing.stock:''}">
-        </div>
-        <button class="btn btn-primary btn-block" onclick="saveItem(${editing?`'${editing.id}'`:'null'})">Guardar producto</button>
-      </div>
-    </div>
-  `;
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h3 class="display">${editing?'Editar producto':'Nuevo producto'}</h3>
+      <div class="field"><label>Nombre</label><input id="itName" type="text" placeholder="Ej. Ceviche de camarón" value="${editing?escapeHtml(editing.name):''}"></div>
+      <div class="field"><label>Categoría</label><select id="itCat">${CATEGORIES.map(c=>`<option ${editing&&editing.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Precio (L)</label><input id="itPrice" type="number" step="0.01" min="0" value="${editing?editing.price:''}"></div>
+      <div class="field"><label>Stock inicial (déjalo vacío si no quieres controlar existencias)</label><input id="itStock" type="number" min="0" value="${editing && typeof editing.stock==='number'?editing.stock:''}"></div>
+      <button class="btn btn-primary btn-block" ${state.busy?'disabled':''} onclick="saveItem(${editing?`'${editing.id}'`:'null'})">Guardar producto</button>
+    </div></div>`;
 }
 async function saveItem(id){
   const name = document.getElementById('itName').value.trim();
@@ -731,21 +552,17 @@ async function saveItem(id){
   const stock = stockRaw==='' ? null : Math.max(0, parseInt(stockRaw,10));
   if(!name){ alert('Escribe el nombre del producto.'); return; }
   if(isNaN(price) || price<0){ alert('Ingresa un precio válido.'); return; }
-
-  if(id){
-    const mi = state.menuItems.find(m=>m.id===id);
-    Object.assign(mi, {name,category,price, stock: stock===null? undefined : stock});
-  }else{
-    state.menuItems.push({id:uid(), name, category, price, stock: stock===null? undefined : stock});
-  }
-  closeModal();
-  setTab('menu');
-  await saveDB();
+  state.busy = true;
+  const payload = {name, category, price, stock};
+  const {error} = id
+    ? await supabaseClient.from('menu_items').update(payload).eq('id', id)
+    : await supabaseClient.from('menu_items').insert(payload);
+  state.busy = false;
+  if(error) return alert('No se pudo guardar: ' + error.message);
+  closeModal(); setTab('menu'); await loadAll();
 }
 
-/* ============================================================
-   FINANZAS
-   ============================================================ */
+/* ============================================================ FINANZAS ============================================================ */
 function rangeStart(range){
   const now = new Date();
   if(range==='hoy'){ return new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(); }
@@ -760,64 +577,38 @@ function renderFinanzas(){
   const expenses = state.expenses.filter(e=> e.date>=start);
   const expenseTotal = expenses.reduce((s,e)=>s+e.amount,0);
   const balance = income - expenseTotal;
-
-  const chips = [
-    {id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}
-  ].map(c=>`<button class="chip ${state.financeRange===c.id?'active':''}" onclick="setFinanceRange('${c.id}')">${c.label}</button>`).join('');
-
+  const chips = [{id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}]
+    .map(c=>`<button class="chip ${state.financeRange===c.id?'active':''}" onclick="setFinanceRange('${c.id}')">${c.label}</button>`).join('');
   const recentOrders = paidOrders.sort((a,b)=>b.paidAt-a.paidAt).slice(0,8).map(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
     return `<div class="list-row"><span>Mesa ${escapeHtml(o.table)} · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span><strong>${money(total)}</strong></div>`;
   }).join('') || `<p class="muted" style="padding:8px 0;">Aún no hay ventas cobradas en este período.</p>`;
-
   const expenseRows = expenses.sort((a,b)=>b.date-a.date).map(e=>`
-    <div class="list-row">
-      <span>${escapeHtml(e.description)}<br><span class="meta">${escapeHtml(e.category)} · ${fmtDateTime(e.date)}</span></span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <strong>${money(e.amount)}</strong>
-        <button class="icon-btn" onclick="deleteExpense('${e.id}')">${ICONS.trash}</button>
-      </div>
-    </div>
-  `).join('') || `<p class="muted" style="padding:8px 0;">Sin gastos registrados en este período.</p>`;
-
+    <div class="list-row"><span>${escapeHtml(e.description)}<br><span class="meta">${escapeHtml(e.category)} · ${fmtDateTime(e.date)}</span></span>
+    <div style="display:flex;align-items:center;gap:8px;"><strong>${money(e.amount)}</strong>
+    <button class="icon-btn" onclick="deleteExpense('${e.id}')">${ICONS.trash}</button></div></div>`).join('') || `<p class="muted" style="padding:8px 0;">Sin gastos registrados en este período.</p>`;
   return `
     <div class="chips">${chips}</div>
     <div class="stat-grid">
       <div class="stat-card income"><div class="label">Ingresos</div><div class="value">${money(income)}</div></div>
       <div class="stat-card expense"><div class="label">Gastos</div><div class="value">${money(expenseTotal)}</div></div>
-      <div class="stat-card wide ${balance>=0?'balance-pos':'balance-neg'}">
-        <div class="label">Balance neto</div><div class="value">${money(balance)}</div>
-      </div>
+      <div class="stat-card wide ${balance>=0?'balance-pos':'balance-neg'}"><div class="label">Balance neto</div><div class="value">${money(balance)}</div></div>
     </div>
-
-    <div class="section-title"><h2>Ventas recientes</h2></div>
-    <div class="card">${recentOrders}</div>
-
-    <div class="section-title"><h2>Gastos</h2>
-      <button class="btn btn-ghost btn-sm" onclick="openExpenseModal()">${ICONS.plus} Agregar</button>
-    </div>
-    <div class="card">${expenseRows}</div>
-  `;
+    <div class="section-title"><h2>Ventas recientes</h2></div><div class="card">${recentOrders}</div>
+    <div class="section-title"><h2>Gastos</h2><button class="btn btn-ghost btn-sm" onclick="openExpenseModal()">${ICONS.plus} Agregar</button></div>
+    <div class="card">${expenseRows}</div>`;
 }
 function setFinanceRange(id){ state.financeRange=id; renderMain(); }
 function openExpenseModal(){
   state.modalOpen = true;
   document.getElementById('modalRoot').innerHTML = `
-    <div class="overlay" onclick="if(event.target===this) closeModal()">
-      <div class="modal modal-wrap">
-        <button class="modal-close" onclick="closeModal()">✕</button>
-        <h3 class="display">Nuevo gasto</h3>
-        <div class="field"><label>Descripción</label><input id="exDesc" type="text" placeholder="Ej. Compra de mariscos"></div>
-        <div class="field"><label>Categoría</label>
-          <select id="exCat">
-            <option>Insumos</option><option>Servicios</option><option>Personal</option><option>Mantenimiento</option><option>Otro</option>
-          </select>
-        </div>
-        <div class="field"><label>Monto (L)</label><input id="exAmount" type="number" step="0.01" min="0"></div>
-        <button class="btn btn-primary btn-block" onclick="saveExpense()">Guardar gasto</button>
-      </div>
-    </div>
-  `;
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button><h3 class="display">Nuevo gasto</h3>
+      <div class="field"><label>Descripción</label><input id="exDesc" type="text" placeholder="Ej. Compra de mariscos"></div>
+      <div class="field"><label>Categoría</label><select id="exCat"><option>Insumos</option><option>Servicios</option><option>Personal</option><option>Mantenimiento</option><option>Otro</option></select></div>
+      <div class="field"><label>Monto (L)</label><input id="exAmount" type="number" step="0.01" min="0"></div>
+      <button class="btn btn-primary btn-block" ${state.busy?'disabled':''} onclick="saveExpense()">Guardar gasto</button>
+    </div></div>`;
 }
 async function saveExpense(){
   const description = document.getElementById('exDesc').value.trim();
@@ -825,57 +616,43 @@ async function saveExpense(){
   const amount = parseFloat(document.getElementById('exAmount').value);
   if(!description){ alert('Describe el gasto.'); return; }
   if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido.'); return; }
-  state.expenses.push({id:uid(), description, category, amount, date:Date.now()});
-  closeModal();
-  setTab('finanzas');
-  await saveDB();
+  state.busy = true;
+  const {error} = await supabaseClient.from('expenses').insert({description, category, amount, date:new Date().toISOString()});
+  state.busy = false;
+  if(error) return alert('No se pudo guardar el gasto: ' + error.message);
+  closeModal(); setTab('finanzas'); await loadAll();
 }
 async function deleteExpense(id){
   if(!confirm('¿Eliminar este gasto?')) return;
-  state.expenses = state.expenses.filter(e=>e.id!==id);
-  renderMain();
-  await saveDB();
+  const {error} = await supabaseClient.from('expenses').delete().eq('id', id);
+  if(error) return alert('No se pudo eliminar: ' + error.message);
+  await loadAll();
 }
 
-/* ============================================================
-   HISTORIAL
-   ============================================================ */
+/* ============================================================ HISTORIAL ============================================================ */
 function renderHistorial(){
   const q = state.historySearch.toLowerCase();
   const sales = state.orders.filter(o=>o.status==='pagado').sort((a,b)=>b.paidAt-a.paidAt)
     .filter(o => !q || (`${o.table} ${o.customer}`.toLowerCase().includes(q)));
-
   const totalVentas = sales.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const avg = sales.length ? totalVentas/sales.length : 0;
-
   const rows = sales.length ? sales.map(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
     const itemsText = o.items.map(i=>`${i.qty}× ${escapeHtml(i.name)}`).join(', ');
-    return `
-      <div class="card" style="margin-bottom:10px;">
-        <div class="list-row" style="border:none;padding-top:0;">
-          <span><strong>Mesa ${escapeHtml(o.table)}</strong> · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span>
-          <strong>${money(total)}</strong>
-        </div>
-        <div class="muted" style="font-size:12.5px;">${itemsText}</div>
-      </div>
-    `;
+    return `<div class="card" style="margin-bottom:10px;"><div class="list-row" style="border:none;padding-top:0;">
+      <span><strong>Mesa ${escapeHtml(o.table)}</strong> · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span>
+      <strong>${money(total)}</strong></div><div class="muted" style="font-size:12.5px;">${itemsText}</div></div>`;
   }).join('') : `<div class="empty"><p class="lead">Sin ventas registradas</p><p>Las ventas cobradas aparecerán aquí automáticamente.</p></div>`;
-
   return `
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Ventas totales</div><div class="value">${money(totalVentas)}</div></div>
       <div class="stat-card"><div class="label">Pedidos</div><div class="value">${sales.length}</div></div>
       <div class="stat-card wide"><div class="label">Ticket promedio</div><div class="value">${money(avg)}</div></div>
     </div>
-    <div class="field">
-      <input type="text" placeholder="Buscar por mesa o cliente…" value="${escapeHtml(state.historySearch)}" oninput="setHistorySearch(this.value)">
-    </div>
-    <button class="btn btn-ghost btn-block" style="margin-bottom:14px;" onclick="exportCsv()">Descargar historial (CSV)</button>
-    ${rows}
-  `;
+    <div class="field"><input type="text" placeholder="Buscar por mesa o cliente…" value="${escapeHtml(state.historySearch)}" oninput="setHistorySearch(this.value)"></div>
+    <button class="btn btn-ghost btn-block" style="margin-bottom:14px;" onclick="exportCsv()">Descargar historial (CSV)</button>${rows}`;
 }
-function setHistorySearch(v){ state.historySearch=v; renderMain(); document.querySelector('#main input') && document.querySelector('#main input').focus(); }
+function setHistorySearch(v){ state.historySearch=v; renderMain(); const inp=document.querySelector('#main input'); if(inp){ inp.focus(); inp.setSelectionRange(v.length, v.length); } }
 function exportCsv(){
   const sales = state.orders.filter(o=>o.status==='pagado').sort((a,b)=>b.paidAt-a.paidAt);
   const rows = [['Fecha','Mesa','Cliente','Artículos','Total (L)']];
@@ -893,8 +670,45 @@ function exportCsv(){
   URL.revokeObjectURL(url);
 }
 
+/* ---------------- autenticación ---------------- */
+function showAuthGate(){
+  document.getElementById('authGate').style.display='flex';
+  document.getElementById('appShell').style.display='none';
+}
+function enterApp(){
+  document.getElementById('authGate').style.display='none';
+  document.getElementById('appShell').style.display='block';
+  loadAll();
+  setupRealtime();
+}
+async function initAuth(){
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if(session){ enterApp(); } else { showAuthGate(); }
+  supabaseClient.auth.onAuthStateChange((event)=>{
+    if(event==='SIGNED_OUT'){ location.reload(); }
+  });
+}
+async function handleLogin(){
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  const btn = document.getElementById('authSubmitBtn');
+  errEl.style.display='none';
+  if(!email || !password){ errEl.textContent='Ingresa tu correo y contraseña.'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent='Entrando…';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent='Iniciar sesión';
+  if(error){ errEl.textContent = 'Correo o contraseña incorrectos.'; errEl.style.display='block'; return; }
+  enterApp();
+}
+async function handleLogout(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  await supabaseClient.auth.signOut();
+  location.reload();
+}
+
 /* ---------------- boot ---------------- */
-loadDB(false);
+initAuth();
 </script>
 </body>
 </html>
