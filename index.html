@@ -127,8 +127,10 @@
   .stock-ok{background:var(--leaf-light);color:var(--leaf);}
   .stock-low{background:var(--coral-light);color:var(--coral);}
   .stock-none{background:#EFEAE0;color:var(--muted);}
-  .menu-row .icon-btn{background:var(--sand);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;}
-  .menu-row .icon-btn svg{width:15px;height:15px;stroke:var(--bay-deep);fill:none;stroke-width:2;}
+  .icon-btn{background:var(--sand);border:none;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;}
+  .icon-btn svg{width:15px;height:15px;stroke:var(--bay-deep);fill:none;stroke-width:2;}
+  .icon-btn-pdf{background:var(--coral-light);}
+  .icon-btn-pdf svg{stroke:var(--coral);}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
   .stat-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;grid-column:span 1;}
@@ -290,7 +292,7 @@ const state = {
   activeTab:'pedidos', orderFilter:'activos', financeRange:'hoy', historySearch:'',
   modalOpen:false, newOrderCart:{}, draftTable:'', draftCustomer:'',
   busy:false, currentEmail:null, isAdmin:false,
-  expenseBudget:0, closings:[],
+  expenseBudget:0, closings:[], cashOnHand:0, fixedExpenses:[],
 };
 
 /* ---------------- data layer (Supabase) ---------------- */
@@ -300,6 +302,8 @@ function mapOrder(row){
     items:row.items || [], status:row.status,
     createdAt:new Date(row.created_at).getTime(),
     paidAt: row.paid_at ? new Date(row.paid_at).getTime() : null,
+    paymentMethod: row.payment_method || null,
+    closingId: row.closing_id || null,
   };
 }
 function mapExpense(row){
@@ -334,6 +338,14 @@ async function loadAll(){
   state.closings = (!closingsRes.error && closingsRes.data) ? closingsRes.data.map(r => ({
     id:r.id, date:r.closing_date, totalSales:Number(r.total_sales), totalExpenses:Number(r.total_expenses),
     orderCount:r.order_count, closedBy:r.closed_by, createdAt:new Date(r.created_at).getTime(),
+  })) : [];
+
+  const cashRes = await supabaseClient.from('settings').select('*').eq('key','cash_on_hand').maybeSingle();
+  state.cashOnHand = (!cashRes.error && cashRes.data) ? Number(cashRes.data.amount) : 0;
+
+  const fixedRes = await supabaseClient.from('fixed_expenses').select('*').order('created_at', {ascending:true});
+  state.fixedExpenses = (!fixedRes.error && fixedRes.data) ? fixedRes.data.map(r => ({
+    id:r.id, name:r.name, amount:Number(r.amount), dueDay:r.due_day, lastPaidDate:r.last_paid_date,
   })) : [];
 
   renderAll();
@@ -408,7 +420,7 @@ function orderCardHtml(o){
   const total = o.items.reduce((s,i)=> s + i.qty*i.price, 0);
   const nextBtn = o.status==='pendiente'
     ? `<button class="btn btn-tide" onclick="markDelivered('${o.id}')">Marcar entregado</button>`
-    : `<button class="btn btn-primary" onclick="markPaid('${o.id}')">Cobrar</button>`;
+    : `<button class="btn btn-primary" onclick="openPaymentModal('${o.id}')">Cobrar</button>`;
   return `
     <div class="order-card ${o.status}"><div class="stripe"></div><div class="body">
       <div class="head"><div><div class="table-tag">Mesa ${escapeHtml(o.table)}</div><div class="customer">${escapeHtml(o.customer)}</div></div>
@@ -425,8 +437,29 @@ async function markDelivered(id){
   if(error) return alert('No se pudo actualizar: ' + error.message);
   await loadAll();
 }
-async function markPaid(id){
-  const {error} = await supabaseClient.from('orders').update({status:'pagado', paid_at:new Date().toISOString()}).eq('id', id);
+function openPaymentModal(orderId){
+  const o = state.orders.find(x=>x.id===orderId); if(!o) return;
+  const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
+  state.modalOpen = true;
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h3 class="display">Cobrar pedido</h3>
+      <p class="muted" style="margin-top:-8px;font-size:14px;">Mesa ${escapeHtml(o.table)} · ${escapeHtml(o.customer)} · <strong style="color:var(--ink);">${money(total)}</strong></p>
+      <label style="display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px;">Método de pago</label>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-ghost btn-block" style="justify-content:flex-start;padding-left:18px;" onclick="confirmPayment('${orderId}','Efectivo')">💵 Efectivo</button>
+        <button class="btn btn-ghost btn-block" style="justify-content:flex-start;padding-left:18px;" onclick="confirmPayment('${orderId}','Transferencia')">🏦 Transferencia</button>
+        <button class="btn btn-ghost btn-block" style="justify-content:flex-start;padding-left:18px;" onclick="confirmPayment('${orderId}','Tarjeta')">💳 Tarjeta</button>
+      </div>
+    </div></div>`;
+}
+async function confirmPayment(orderId, method){
+  closeModal();
+  await markPaid(orderId, method);
+}
+async function markPaid(id, method){
+  const {error} = await supabaseClient.from('orders').update({status:'pagado', paid_at:new Date().toISOString(), payment_method: method || null}).eq('id', id);
   if(error) return alert('No se pudo cobrar el pedido: ' + error.message);
   await loadAll();
 }
@@ -463,7 +496,9 @@ function renderNewOrderModal(){
     const mi = state.menuItems.find(m=>m.id===id); return s + (mi? mi.price*qty : 0);
   },0);
   const itemCount = Object.values(state.newOrderCart).reduce((a,b)=>a+b,0);
-  document.getElementById('modalRoot').innerHTML = `
+  const modalRootEl = document.getElementById('modalRoot');
+  const prevScroll = modalRootEl.querySelector('.modal') ? modalRootEl.querySelector('.modal').scrollTop : 0;
+  modalRootEl.innerHTML = `
     <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
       <button class="modal-close" onclick="closeModal()">✕</button>
       <h3 class="display">Nuevo pedido</h3>
@@ -474,6 +509,8 @@ function renderNewOrderModal(){
       <div class="cart-bar"><div><div class="sub">${itemCount} artículo${itemCount===1?'':'s'}</div><div class="amt">${money(subtotal)}</div></div>
       <button class="btn btn-primary" ${state.busy?'disabled':''} onclick="submitNewOrder()">Crear pedido</button></div>
     </div></div>`;
+  const restoredModal = modalRootEl.querySelector('.modal');
+  if(restoredModal) restoredModal.scrollTop = prevScroll;
 }
 function cartQty(itemId, delta){
   state.draftTable = document.getElementById('ordTable') ? document.getElementById('ordTable').value : state.draftTable;
@@ -494,6 +531,9 @@ async function submitNewOrder(){
     const mi = state.menuItems.find(m=>m.id===id);
     return {itemId:id, name:mi.name, price:mi.price, qty};
   });
+  const previewTotal = items.reduce((s,i)=>s+i.qty*i.price,0);
+  const previewText = `Mesa ${table} · ${customer}\n\n` + items.map(i=>`${i.qty}× ${i.name}`).join('\n') + `\n\nTotal: ${money(previewTotal)}\n\n¿Confirmar y crear este pedido?`;
+  if(!confirm(previewText)) return;
   state.busy = true;
   const {error} = await supabaseClient.from('orders').insert({
     table_number: table, customer_name: customer, items, status:'pendiente'
@@ -597,7 +637,7 @@ function renderFinanzas(){
   const expenseTotal = expenses.reduce((s,e)=>s+e.amount,0);
 
   const todayStart = rangeStart('hoy');
-  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart);
+  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
   const todaysSalesTotal = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
 
   const chips = [{id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}]
@@ -605,7 +645,7 @@ function renderFinanzas(){
 
   const recentOrders = paidOrders.sort((a,b)=>b.paidAt-a.paidAt).slice(0,8).map(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
-    return `<div class="list-row"><span>Mesa ${escapeHtml(o.table)} · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span><strong>${money(total)}</strong></div>`;
+    return `<div class="list-row"><span>Mesa ${escapeHtml(o.table)} · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}${o.paymentMethod?' · '+escapeHtml(o.paymentMethod):''}</span></span><strong>${money(total)}</strong></div>`;
   }).join('') || `<p class="muted" style="padding:8px 0;">Aún no hay ventas cobradas en este período.</p>`;
 
   const expenseRows = expenses.sort((a,b)=>b.date-a.date).map(e=>`
@@ -616,7 +656,7 @@ function renderFinanzas(){
   const closingsRows = state.closings.slice(0,6).map(c=>`
     <div class="list-row"><span>${fmtDateOnly(c.date)}<br><span class="meta">${c.orderCount} pedido(s)${c.closedBy? ' · '+escapeHtml(c.closedBy):''}<br>Gastos ese día: ${money(c.totalExpenses)}</span></span>
     <div style="display:flex;align-items:center;gap:8px;"><strong>${money(c.totalSales)}</strong>
-    <button class="icon-btn" onclick="generateClosingPdf('${c.id}')" title="Descargar PDF">${ICONS.pdf}</button></div></div>
+    <button class="icon-btn icon-btn-pdf" onclick="generateClosingPdf('${c.id}')" title="Descargar PDF">${ICONS.pdf}</button></div></div>
   `).join('') || `<p class="muted" style="padding:8px 0;">Aún no se ha hecho ningún cierre.</p>`;
 
   const budgetPct = state.expenseBudget>0 ? Math.min(100, (expenseTotal/state.expenseBudget)*100) : 0;
@@ -632,10 +672,11 @@ function renderFinanzas(){
     <div class="section-title"><h2>Cierre de caja</h2></div>
     <div class="card">
       <div class="list-row" style="border:none;padding-top:0;">
-        <span>Ventas de hoy sin cerrar<br><span class="meta">${todaysPaid.length} pedido(s) cobrados</span></span>
+        <span>Ventas sin cerrar<br><span class="meta">${todaysPaid.length} pedido(s) cobrados</span></span>
         <strong>${money(todaysSalesTotal)}</strong>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="performDailyClosing()">Realizar cierre del día</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="downloadTodayPdf()">${ICONS.pdf.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:4px;"')} Descargar PDF de hoy</button>
     </div>
     <div class="section-title"><h2>Cierres recientes</h2></div>
     <div class="card">${closingsRows}</div>
@@ -656,9 +697,34 @@ function renderFinanzas(){
       ` : ''}
     </div>
     <div class="card">${expenseRows}</div>
+    ${renderCajaAdmin()}
   `;
 }
-function setFinanceRange(id){ state.financeRange=id; renderMain(); }
+function renderCajaAdmin(){
+  if(!state.isAdmin) return '';
+  const rows = state.fixedExpenses.map(fe=>{
+    const pending = fixedExpenseIsPending(fe);
+    const dueLabel = fe.dueDay ? `Vence el ${fe.dueDay} de cada mes` : 'Sin fecha definida';
+    return `<div class="list-row">
+      <span>${escapeHtml(fe.name)}<br><span class="meta">${dueLabel}${fe.lastPaidDate? ' · Últ. pago: '+fmtDateOnly(fe.lastPaidDate):''}</span></span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <strong>${money(fe.amount)}</strong>
+        <span class="stock-badge ${pending?'stock-low':'stock-ok'}">${pending?'Pendiente':'Pagado'}</span>
+        ${pending ? `<button class="btn btn-sm btn-primary" onclick="payFixedExpense('${fe.id}')">Pagar</button>` : ''}
+        <button class="icon-btn" onclick="deleteFixedExpense('${fe.id}')" title="Eliminar">${ICONS.trash}</button>
+      </div>
+    </div>`;
+  }).join('') || `<p class="muted" style="padding:8px 0;">No has agregado gastos fijos todavía.</p>`;
+
+  return `
+    <div class="section-title"><h2>Caja <span class="muted" style="font-size:11.5px;font-weight:500;">· solo administrador</span></h2><button class="icon-btn" onclick="openCashModal()" title="Ajustar caja">${ICONS.edit}</button></div>
+    <div class="card">
+      <div class="list-row" style="border:none;padding-top:0;"><span>Dinero en caja</span><strong style="font-size:19px;">${money(state.cashOnHand)}</strong></div>
+    </div>
+    <div class="section-title"><h2>Gastos fijos</h2><button class="btn btn-ghost btn-sm" onclick="openFixedExpenseModal()">${ICONS.plus} Agregar</button></div>
+    <div class="card">${rows}</div>
+  `;
+}
 function openExpenseModal(){
   state.modalOpen = true;
   document.getElementById('modalRoot').innerHTML = `
@@ -688,6 +754,71 @@ async function deleteExpense(id){
   if(error) return alert('No se pudo eliminar: ' + error.message);
   await loadAll();
 }
+function openCashModal(){
+  state.modalOpen = true;
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button><h3 class="display">Ajustar caja</h3>
+      <p class="muted" style="margin-top:-6px;font-size:13px;">Define cuánto dinero hay actualmente en caja.</p>
+      <div class="field"><label>Monto en caja (L)</label><input id="cashAmount" type="number" step="0.01" value="${state.cashOnHand||''}"></div>
+      <button class="btn btn-primary btn-block" onclick="saveCash()">Guardar</button>
+    </div></div>`;
+}
+async function saveCash(){
+  const amount = parseFloat(document.getElementById('cashAmount').value);
+  if(isNaN(amount)){ alert('Ingresa un monto válido.'); return; }
+  const {error} = await supabaseClient.from('settings').upsert({key:'cash_on_hand', amount, updated_at:new Date().toISOString()});
+  if(error) return alert('No se pudo guardar: ' + error.message);
+  closeModal(); setTab('finanzas'); await loadAll();
+}
+function openFixedExpenseModal(){
+  state.modalOpen = true;
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="overlay" onclick="if(event.target===this) closeModal()"><div class="modal modal-wrap">
+      <button class="modal-close" onclick="closeModal()">✕</button><h3 class="display">Nuevo gasto fijo</h3>
+      <div class="field"><label>Nombre</label><input id="feName" type="text" placeholder="Ej. Alquiler, Internet, Préstamo"></div>
+      <div class="field"><label>Monto (L)</label><input id="feAmount" type="number" step="0.01" min="0"></div>
+      <div class="field"><label>Día del mes en que vence (opcional)</label><input id="feDueDay" type="number" min="1" max="31" placeholder="Ej. 22"></div>
+      <button class="btn btn-primary btn-block" onclick="saveFixedExpense()">Guardar gasto fijo</button>
+    </div></div>`;
+}
+async function saveFixedExpense(){
+  const name = document.getElementById('feName').value.trim();
+  const amount = parseFloat(document.getElementById('feAmount').value);
+  const dueDayRaw = document.getElementById('feDueDay').value;
+  const dueDay = dueDayRaw==='' ? null : Math.min(31, Math.max(1, parseInt(dueDayRaw,10)));
+  if(!name){ alert('Escribe el nombre del gasto.'); return; }
+  if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido.'); return; }
+  const {error} = await supabaseClient.from('fixed_expenses').insert({name, amount, due_day: dueDay});
+  if(error) return alert('No se pudo guardar: ' + error.message);
+  closeModal(); setTab('finanzas'); await loadAll();
+}
+async function deleteFixedExpense(id){
+  if(!confirm('¿Eliminar este gasto fijo?')) return;
+  const {error} = await supabaseClient.from('fixed_expenses').delete().eq('id', id);
+  if(error) return alert('No se pudo eliminar: ' + error.message);
+  await loadAll();
+}
+function fixedExpenseIsPending(fe){
+  if(!fe.dueDay){ return !fe.lastPaidDate; }
+  const now = new Date();
+  let cycleStart = new Date(now.getFullYear(), now.getMonth(), fe.dueDay);
+  if(now.getDate() < fe.dueDay){ cycleStart = new Date(now.getFullYear(), now.getMonth()-1, fe.dueDay); }
+  if(!fe.lastPaidDate) return true;
+  return new Date(fe.lastPaidDate+'T00:00:00') < cycleStart;
+}
+async function payFixedExpense(id){
+  const fe = state.fixedExpenses.find(x=>x.id===id); if(!fe) return;
+  if(!confirm(`¿Marcar "${fe.name}" (${money(fe.amount)}) como pagado? Se descontará de la caja y quedará registrado en Gastos.`)) return;
+  const todayIso = new Date().toISOString().slice(0,10);
+  const newCash = state.cashOnHand - fe.amount;
+  const {error:e1} = await supabaseClient.from('fixed_expenses').update({last_paid_date: todayIso}).eq('id', id);
+  if(e1) return alert('No se pudo actualizar: ' + e1.message);
+  const {error:e2} = await supabaseClient.from('settings').upsert({key:'cash_on_hand', amount:newCash, updated_at:new Date().toISOString()});
+  if(e2) return alert('No se pudo actualizar la caja: ' + e2.message);
+  await supabaseClient.from('expenses').insert({description: fe.name, category:'Gasto fijo', amount: fe.amount, date:new Date().toISOString()});
+  await loadAll();
+}
 function openBudgetModal(){
   state.modalOpen = true;
   document.getElementById('modalRoot').innerHTML = `
@@ -707,28 +838,26 @@ async function saveBudget(){
 }
 async function performDailyClosing(){
   const todayStart = rangeStart('hoy');
-  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart);
+  const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
   const totalSales = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const totalExpenses = state.expenses.filter(e=>e.date>=todayStart).reduce((s,e)=>s+e.amount,0);
-  if(todaysPaid.length===0){ alert('Todavía no hay ventas cobradas hoy.'); return; }
-  if(!confirm(`¿Cerrar el día con ${todaysPaid.length} venta(s) por un total de ${money(totalSales)}? Se guardará permanentemente en el historial de cierres y no se puede deshacer.`)) return;
-  const {error} = await supabaseClient.from('daily_closings').insert({
+  if(todaysPaid.length===0){ alert('No hay ventas sin cerrar todavía.'); return; }
+  if(!confirm(`¿Cerrar el día con ${todaysPaid.length} venta(s) por un total de ${money(totalSales)}? Se guardará permanentemente en el historial de cierres, el conteo se reiniciará, y no se puede deshacer.`)) return;
+  const {data:closingRow, error} = await supabaseClient.from('daily_closings').insert({
     closing_date: new Date().toISOString().slice(0,10),
     total_sales: totalSales,
     total_expenses: totalExpenses,
     order_count: todaysPaid.length,
     closed_by: state.currentEmail || null,
-  });
+  }).select().single();
   if(error) return alert('No se pudo guardar el cierre: ' + error.message);
+  const idsToClose = todaysPaid.map(o=>o.id);
+  const {error: linkError} = await supabaseClient.from('orders').update({closing_id: closingRow.id}).in('id', idsToClose);
+  if(linkError) alert('El cierre se guardó, pero no se pudo reiniciar el conteo: ' + linkError.message);
   alert('Cierre del día guardado correctamente.');
   await loadAll();
 }
-function generateClosingPdf(closingId){
-  const c = state.closings.find(x=>x.id===closingId); if(!c) return;
-  const dayStart = new Date(c.date+'T00:00:00').getTime();
-  const dayEnd = dayStart + 24*60*60*1000;
-  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=dayStart && o.paidAt<dayEnd).sort((a,b)=>a.paidAt-b.paidAt);
-  const dayExpenses = state.expenses.filter(e=>e.date>=dayStart && e.date<dayEnd).sort((a,b)=>a.date-b.date);
+function buildDailyPdf(dateStr, dayOrders, dayExpenses, closedBy){
   const totalSales = dayOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const totalExpenses = dayExpenses.reduce((s,e)=>s+e.amount,0);
 
@@ -736,14 +865,28 @@ function generateClosingPdf(closingId){
   const doc = new jsPDF();
   let y = 20;
   doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text('Bahía Catracha', 14, y); y+=8;
-  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.text('Cierre diario · ' + fmtDateOnly(c.date), 14, y); y+=6;
-  if(c.closedBy){ doc.setFontSize(10); doc.setTextColor(120); doc.text('Cerrado por ' + c.closedBy, 14, y); doc.setTextColor(0); y+=10; } else { y+=6; }
+  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.text('Cierre diario · ' + fmtDateOnly(dateStr), 14, y); y+=6;
+  if(closedBy){ doc.setFontSize(10); doc.setTextColor(120); doc.text('Cerrado por ' + closedBy, 14, y); doc.setTextColor(0); y+=10; } else { y+=6; }
 
   doc.setDrawColor(220); doc.line(14, y, 196, y); y+=8;
   doc.setFont('helvetica','bold'); doc.setFontSize(12);
   doc.text('Ventas totales:', 14, y); doc.text(money(totalSales), 196, y, {align:'right'}); y+=7;
   doc.text('Gastos totales:', 14, y); doc.text(money(totalExpenses), 196, y, {align:'right'}); y+=7;
   doc.text('Neto del día:', 14, y); doc.text(money(totalSales-totalExpenses), 196, y, {align:'right'}); y+=10;
+
+  const byMethod = {};
+  dayOrders.forEach(o=>{
+    const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
+    const key = o.paymentMethod || 'Sin especificar';
+    byMethod[key] = (byMethod[key]||0) + total;
+  });
+  if(Object.keys(byMethod).length){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+    Object.entries(byMethod).forEach(([method, amt])=>{
+      doc.text(`${method}: ${money(amt)}`, 14, y); y+=5;
+    });
+    doc.setTextColor(0); y+=4;
+  }
   doc.setDrawColor(220); doc.line(14, y, 196, y); y+=10;
 
   doc.setFontSize(13); doc.text('Ventas del día', 14, y); y+=7;
@@ -751,7 +894,7 @@ function generateClosingPdf(closingId){
   if(!dayOrders.length){ doc.text('Sin ventas registradas.', 14, y); y+=6; }
   dayOrders.forEach(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
-    const itemsText = o.items.map(i=>`${i.qty}x ${i.name}`).join(', ');
+    const itemsText = o.items.map(i=>`${i.qty}x ${i.name}`).join(', ') + (o.paymentMethod ? ` · ${o.paymentMethod}` : '');
     if(y>270){ doc.addPage(); y=20; }
     doc.setFont('helvetica','bold');
     doc.text(`Mesa ${o.table} · ${o.customer}`, 14, y);
@@ -773,7 +916,23 @@ function generateClosingPdf(closingId){
     y+=6;
   });
 
-  doc.save(`bahia-catracha-cierre-${c.date}.pdf`);
+  return doc;
+}
+function generateClosingPdf(closingId){
+  const c = state.closings.find(x=>x.id===closingId); if(!c) return;
+  const dayStart = new Date(c.date+'T00:00:00').getTime();
+  const dayEnd = dayStart + 24*60*60*1000;
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=dayStart && o.paidAt<dayEnd).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayExpenses = state.expenses.filter(e=>e.date>=dayStart && e.date<dayEnd).sort((a,b)=>a.date-b.date);
+  buildDailyPdf(c.date, dayOrders, dayExpenses, c.closedBy).save(`bahia-catracha-cierre-${c.date}.pdf`);
+}
+function downloadTodayPdf(){
+  const todayStart = rangeStart('hoy');
+  const todayDate = new Date().toISOString().slice(0,10);
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayExpenses = state.expenses.filter(e=>e.date>=todayStart).sort((a,b)=>a.date-b.date);
+  if(!dayOrders.length && !dayExpenses.length){ alert('Todavía no hay ventas ni gastos registrados hoy.'); return; }
+  buildDailyPdf(todayDate, dayOrders, dayExpenses, state.currentEmail).save(`bahia-catracha-hoy-${todayDate}.pdf`);
 }
 async function deleteSale(id){
   if(!state.isAdmin) return;
@@ -801,7 +960,7 @@ function renderHistorial(){
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
     const itemsText = o.items.map(i=>`${i.qty}× ${escapeHtml(i.name)}`).join(', ');
     return `<div class="card" style="margin-bottom:10px;"><div class="list-row" style="border:none;padding-top:0;">
-      <span><strong>Mesa ${escapeHtml(o.table)}</strong> · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}</span></span>
+      <span><strong>Mesa ${escapeHtml(o.table)}</strong> · ${escapeHtml(o.customer)}<br><span class="meta">${fmtDateTime(o.paidAt)}${o.paymentMethod?' · '+escapeHtml(o.paymentMethod):''}</span></span>
       <div style="display:flex;align-items:center;gap:8px;"><strong>${money(total)}</strong>
       ${state.isAdmin ? `<button class="icon-btn" onclick="deleteSale('${o.id}')" title="Eliminar venta">${ICONS.trash}</button>` : ''}</div></div>
       <div class="muted" style="font-size:12.5px;">${itemsText}</div></div>`;
@@ -813,24 +972,43 @@ function renderHistorial(){
       <div class="stat-card wide"><div class="label">Ticket promedio</div><div class="value">${money(avg)}</div></div>
     </div>
     <div class="field"><input type="text" placeholder="Buscar por mesa o cliente…" value="${escapeHtml(state.historySearch)}" oninput="setHistorySearch(this.value)"></div>
-    <button class="btn btn-ghost btn-block" style="margin-bottom:14px;" onclick="exportCsv()">Descargar historial (CSV)</button>${rows}`;
+    <button class="btn btn-ghost btn-block" style="margin-bottom:14px;" onclick="exportHistorialPdf()">${ICONS.pdf.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:4px;"')} Descargar historial completo (PDF)</button>${rows}`;
 }
 function setHistorySearch(v){ state.historySearch=v; renderMain(); const inp=document.querySelector('#main input'); if(inp){ inp.focus(); inp.setSelectionRange(v.length, v.length); } }
-function exportCsv(){
-  const sales = state.orders.filter(o=>o.status==='pagado').sort((a,b)=>b.paidAt-a.paidAt);
-  const rows = [['Fecha','Mesa','Cliente','Artículos','Total (L)']];
+function exportHistorialPdf(){
+  const q = state.historySearch.toLowerCase();
+  const sales = state.orders.filter(o=>o.status==='pagado').sort((a,b)=>b.paidAt-a.paidAt)
+    .filter(o => !q || (`${o.table} ${o.customer}`.toLowerCase().includes(q)));
+  if(!sales.length){ alert('No hay ventas para exportar.'); return; }
+  const totalVentas = sales.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 20;
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text('Bahía Catracha', 14, y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.text('Historial de ventas', 14, y); y+=6;
+  doc.setFontSize(10); doc.setTextColor(120); doc.text('Generado ' + new Date().toLocaleString('es-HN'), 14, y); doc.setTextColor(0); y+=10;
+  doc.setDrawColor(220); doc.line(14, y, 196, y); y+=8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Ventas totales: ' + money(totalVentas), 14, y); y+=6;
+  doc.text('Cantidad de pedidos: ' + sales.length, 14, y); y+=10;
+  doc.setDrawColor(220); doc.line(14, y, 196, y); y+=8;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
   sales.forEach(o=>{
     const total = o.items.reduce((s,i)=>s+i.qty*i.price,0);
-    const itemsText = o.items.map(i=>`${i.qty}x ${i.name}`).join(' | ');
-    rows.push([new Date(o.paidAt).toISOString(), o.table, o.customer, itemsText, total.toFixed(2)]);
+    const itemsText = o.items.map(i=>`${i.qty}x ${i.name}`).join(', ') + (o.paymentMethod ? ` · ${o.paymentMethod}` : '');
+    if(y>270){ doc.addPage(); y=20; }
+    doc.setFont('helvetica','bold');
+    doc.text(`Mesa ${o.table} · ${o.customer} · ${fmtDateTime(o.paidAt)}`, 14, y);
+    doc.text(money(total), 196, y, {align:'right'});
+    y+=5;
+    doc.setFont('helvetica','normal'); doc.setTextColor(120);
+    doc.splitTextToSize(itemsText, 170).forEach(line=>{ if(y>270){ doc.addPage(); y=20; } doc.text(line, 14, y); y+=5; });
+    doc.setTextColor(0); y+=3;
   });
-  const csv = '\ufeff' + 'sep=;\r\n' + rows.map(r => r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'bahia-catracha-historial.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+  doc.save('bahia-catracha-historial.pdf');
 }
 
 /* ---------------- autenticación ---------------- */
