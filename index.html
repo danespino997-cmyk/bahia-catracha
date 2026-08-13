@@ -656,7 +656,8 @@ function renderFinanzas(){
   const closingsRows = state.closings.slice(0,6).map(c=>`
     <div class="list-row"><span>${fmtDateOnly(c.date)}<br><span class="meta">${c.orderCount} pedido(s)${c.closedBy? ' · '+escapeHtml(c.closedBy):''}<br>Gastos ese día: ${money(c.totalExpenses)}</span></span>
     <div style="display:flex;align-items:center;gap:8px;"><strong>${money(c.totalSales)}</strong>
-    <button class="icon-btn icon-btn-pdf" onclick="generateClosingPdf('${c.id}')" title="Descargar PDF">${ICONS.pdf}</button></div></div>
+    <button class="icon-btn icon-btn-pdf" onclick="generateClosingPdf('${c.id}')" title="Descargar PDF">${ICONS.pdf}</button>
+    ${state.isAdmin ? `<button class="icon-btn" onclick="deleteClosing('${c.id}')" title="Eliminar cierre">${ICONS.trash}</button>` : ''}</div></div>
   `).join('') || `<p class="muted" style="padding:8px 0;">Aún no se ha hecho ningún cierre.</p>`;
 
   const budgetPct = state.expenseBudget>0 ? Math.min(100, (expenseTotal/state.expenseBudget)*100) : 0;
@@ -857,9 +858,9 @@ async function performDailyClosing(){
   alert('Cierre del día guardado correctamente.');
   await loadAll();
 }
-function buildDailyPdf(dateStr, dayOrders, dayExpenses, closedBy){
-  const totalSales = dayOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
-  const totalExpenses = dayExpenses.reduce((s,e)=>s+e.amount,0);
+function buildDailyPdf(dateStr, dayOrders, dayExpenses, closedBy, officialTotals){
+  const totalSales = officialTotals ? officialTotals.totalSales : dayOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
+  const totalExpenses = officialTotals ? officialTotals.totalExpenses : dayExpenses.reduce((s,e)=>s+e.amount,0);
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -922,9 +923,9 @@ function generateClosingPdf(closingId){
   const c = state.closings.find(x=>x.id===closingId); if(!c) return;
   const dayStart = new Date(c.date+'T00:00:00').getTime();
   const dayEnd = dayStart + 24*60*60*1000;
-  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=dayStart && o.paidAt<dayEnd).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && (o.closingId===c.id || (o.paidAt>=dayStart && o.paidAt<dayEnd))).sort((a,b)=>a.paidAt-b.paidAt);
   const dayExpenses = state.expenses.filter(e=>e.date>=dayStart && e.date<dayEnd).sort((a,b)=>a.date-b.date);
-  buildDailyPdf(c.date, dayOrders, dayExpenses, c.closedBy).save(`bahia-catracha-cierre-${c.date}.pdf`);
+  buildDailyPdf(c.date, dayOrders, dayExpenses, c.closedBy, {totalSales:c.totalSales, totalExpenses:c.totalExpenses}).save(`bahia-catracha-cierre-${c.date}.pdf`);
 }
 function downloadTodayPdf(){
   const todayStart = rangeStart('hoy');
@@ -933,6 +934,15 @@ function downloadTodayPdf(){
   const dayExpenses = state.expenses.filter(e=>e.date>=todayStart).sort((a,b)=>a.date-b.date);
   if(!dayOrders.length && !dayExpenses.length){ alert('Todavía no hay ventas ni gastos registrados hoy.'); return; }
   buildDailyPdf(todayDate, dayOrders, dayExpenses, state.currentEmail).save(`bahia-catracha-hoy-${todayDate}.pdf`);
+}
+async function deleteClosing(closingId){
+  if(!state.isAdmin) return;
+  if(!confirm('¿Eliminar este cierre? Las ventas que tenía asociadas volverán a aparecer como "sin cerrar". Útil para borrar cierres duplicados de pruebas.')) return;
+  const {error:e1} = await supabaseClient.from('orders').update({closing_id:null}).eq('closing_id', closingId);
+  if(e1) return alert('No se pudo liberar las ventas asociadas: ' + e1.message);
+  const {error:e2} = await supabaseClient.from('daily_closings').delete().eq('id', closingId);
+  if(e2) return alert('No se pudo eliminar el cierre: ' + e2.message);
+  await loadAll();
 }
 async function deleteSale(id){
   if(!state.isAdmin) return;
