@@ -307,7 +307,7 @@ function mapOrder(row){
   };
 }
 function mapExpense(row){
-  return { id:row.id, description:row.description, category:row.category, amount:Number(row.amount), date:new Date(row.date).getTime() };
+  return { id:row.id, description:row.description, category:row.category, amount:Number(row.amount), date:new Date(row.date).getTime(), closingId: row.closing_id || null };
 }
 
 async function loadAll(){
@@ -631,14 +631,22 @@ function rangeStart(range){
 }
 function renderFinanzas(){
   const start = rangeStart(state.financeRange);
-  const paidOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=start);
+  // "Hoy" refleja solo lo que aún no se ha cerrado, para que un cierre lo regrese a cero.
+  // Los demás períodos (7 días, mes, todo) son reportes históricos e incluyen todo, cerrado o no.
+  const paidOrders = state.financeRange==='hoy'
+    ? state.orders.filter(o=>o.status==='pagado' && o.paidAt>=start && !o.closingId)
+    : state.orders.filter(o=>o.status==='pagado' && o.paidAt>=start);
   const income = paidOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
-  const expenses = state.expenses.filter(e=> e.date>=start);
+  const expenses = state.financeRange==='hoy'
+    ? state.expenses.filter(e=> e.date>=start && !e.closingId)
+    : state.expenses.filter(e=> e.date>=start);
   const expenseTotal = expenses.reduce((s,e)=>s+e.amount,0);
 
   const todayStart = rangeStart('hoy');
   const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
   const todaysSalesTotal = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
+  const todaysExpensesPending = state.expenses.filter(e=>e.date>=todayStart && !e.closingId);
+  const todaysExpensesTotal = todaysExpensesPending.reduce((s,e)=>s+e.amount,0);
 
   const chips = [{id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}]
     .map(c=>`<button class="chip ${state.financeRange===c.id?'active':''}" onclick="setFinanceRange('${c.id}')">${c.label}</button>`).join('');
@@ -675,6 +683,10 @@ function renderFinanzas(){
       <div class="list-row" style="border:none;padding-top:0;">
         <span>Ventas sin cerrar<br><span class="meta">${todaysPaid.length} pedido(s) cobrados</span></span>
         <strong>${money(todaysSalesTotal)}</strong>
+      </div>
+      <div class="list-row">
+        <span>Gastos sin cerrar<br><span class="meta">${todaysExpensesPending.length} gasto(s) de hoy</span></span>
+        <strong>${money(todaysExpensesTotal)}</strong>
       </div>
       <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="performDailyClosing()">Realizar cierre del día</button>
       <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="downloadTodayPdf()">${ICONS.pdf.replace('<svg','<svg width="16" height="16" style="vertical-align:-3px;margin-right:4px;"')} Descargar PDF de hoy</button>
@@ -840,10 +852,11 @@ async function saveBudget(){
 async function performDailyClosing(){
   const todayStart = rangeStart('hoy');
   const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
+  const todaysExpenses = state.expenses.filter(e=>e.date>=todayStart && !e.closingId);
   const totalSales = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
-  const totalExpenses = state.expenses.filter(e=>e.date>=todayStart).reduce((s,e)=>s+e.amount,0);
+  const totalExpenses = todaysExpenses.reduce((s,e)=>s+e.amount,0);
   if(todaysPaid.length===0){ alert('No hay ventas sin cerrar todavía.'); return; }
-  if(!confirm(`¿Cerrar el día con ${todaysPaid.length} venta(s) por un total de ${money(totalSales)}? Se guardará permanentemente en el historial de cierres, el conteo se reiniciará, y no se puede deshacer.`)) return;
+  if(!confirm(`¿Cerrar el día con ${todaysPaid.length} venta(s) por un total de ${money(totalSales)} y ${todaysExpenses.length} gasto(s) por ${money(totalExpenses)}? Se guardará permanentemente en el historial de cierres, el conteo se reiniciará, y no se puede deshacer.`)) return;
   const {data:closingRow, error} = await supabaseClient.from('daily_closings').insert({
     closing_date: new Date().toISOString().slice(0,10),
     total_sales: totalSales,
@@ -854,7 +867,12 @@ async function performDailyClosing(){
   if(error) return alert('No se pudo guardar el cierre: ' + error.message);
   const idsToClose = todaysPaid.map(o=>o.id);
   const {error: linkError} = await supabaseClient.from('orders').update({closing_id: closingRow.id}).in('id', idsToClose);
-  if(linkError) alert('El cierre se guardó, pero no se pudo reiniciar el conteo: ' + linkError.message);
+  if(linkError) alert('El cierre se guardó, pero no se pudo reiniciar el conteo de ventas: ' + linkError.message);
+  if(todaysExpenses.length){
+    const expenseIdsToClose = todaysExpenses.map(e=>e.id);
+    const {error: expLinkError} = await supabaseClient.from('expenses').update({closing_id: closingRow.id}).in('id', expenseIdsToClose);
+    if(expLinkError) alert('El cierre se guardó, pero no se pudo reiniciar el conteo de gastos: ' + expLinkError.message);
+  }
   alert('Cierre del día guardado correctamente.');
   await loadAll();
 }
@@ -871,9 +889,8 @@ function buildDailyPdf(dateStr, dayOrders, dayExpenses, closedBy, officialTotals
 
   doc.setDrawColor(220); doc.line(14, y, 196, y); y+=8;
   doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  doc.text('Ventas totales:', 14, y); doc.text(money(totalSales), 196, y, {align:'right'}); y+=7;
-  doc.text('Gastos totales:', 14, y); doc.text(money(totalExpenses), 196, y, {align:'right'}); y+=7;
-  doc.text('Neto del día:', 14, y); doc.text(money(totalSales-totalExpenses), 196, y, {align:'right'}); y+=10;
+  doc.text('Ventas totales:', 14, y); doc.text(money(totalSales), 196, y, {align:'right'}); y+=8;
+  doc.text('Gastos totales:', 14, y); doc.text(money(totalExpenses), 196, y, {align:'right'}); y+=10;
 
   const byMethod = {};
   dayOrders.forEach(o=>{
@@ -923,15 +940,18 @@ function generateClosingPdf(closingId){
   const c = state.closings.find(x=>x.id===closingId); if(!c) return;
   const dayStart = new Date(c.date+'T00:00:00').getTime();
   const dayEnd = dayStart + 24*60*60*1000;
-  const dayOrders = state.orders.filter(o=>o.status==='pagado' && (o.closingId===c.id || (o.paidAt>=dayStart && o.paidAt<dayEnd))).sort((a,b)=>a.paidAt-b.paidAt);
-  const dayExpenses = state.expenses.filter(e=>e.date>=dayStart && e.date<dayEnd).sort((a,b)=>a.date-b.date);
+  // Prioriza el vínculo directo al cierre (closing_id). Si un registro antiguo no tiene
+  // ese vínculo (cierres hechos antes de esta corrección), usamos el rango de fecha como respaldo.
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && (o.closingId===c.id || (!o.closingId && o.paidAt>=dayStart && o.paidAt<dayEnd))).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayExpenses = state.expenses.filter(e=>e.closingId===c.id || (!e.closingId && e.date>=dayStart && e.date<dayEnd)).sort((a,b)=>a.date-b.date);
   buildDailyPdf(c.date, dayOrders, dayExpenses, c.closedBy, {totalSales:c.totalSales, totalExpenses:c.totalExpenses}).save(`bahia-catracha-cierre-${c.date}.pdf`);
 }
 function downloadTodayPdf(){
   const todayStart = rangeStart('hoy');
   const todayDate = new Date().toISOString().slice(0,10);
-  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart).sort((a,b)=>a.paidAt-b.paidAt);
-  const dayExpenses = state.expenses.filter(e=>e.date>=todayStart).sort((a,b)=>a.date-b.date);
+  // Solo lo que aún no se ha cerrado, para que coincida con lo que muestra la pantalla de "Hoy".
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart && !o.closingId).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayExpenses = state.expenses.filter(e=>e.date>=todayStart && !e.closingId).sort((a,b)=>a.date-b.date);
   if(!dayOrders.length && !dayExpenses.length){ alert('Todavía no hay ventas ni gastos registrados hoy.'); return; }
   buildDailyPdf(todayDate, dayOrders, dayExpenses, state.currentEmail).save(`bahia-catracha-hoy-${todayDate}.pdf`);
 }
@@ -940,6 +960,8 @@ async function deleteClosing(closingId){
   if(!confirm('¿Eliminar este cierre? Las ventas que tenía asociadas volverán a aparecer como "sin cerrar". Útil para borrar cierres duplicados de pruebas.')) return;
   const {error:e1} = await supabaseClient.from('orders').update({closing_id:null}).eq('closing_id', closingId);
   if(e1) return alert('No se pudo liberar las ventas asociadas: ' + e1.message);
+  const {error:e1b} = await supabaseClient.from('expenses').update({closing_id:null}).eq('closing_id', closingId);
+  if(e1b) return alert('No se pudo liberar los gastos asociados: ' + e1b.message);
   const {error:e2} = await supabaseClient.from('daily_closings').delete().eq('id', closingId);
   if(e2) return alert('No se pudo eliminar el cierre: ' + e2.message);
   await loadAll();
