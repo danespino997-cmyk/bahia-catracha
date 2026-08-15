@@ -631,21 +631,22 @@ function rangeStart(range){
 }
 function renderFinanzas(){
   const start = rangeStart(state.financeRange);
-  // "Hoy" refleja solo lo que aún no se ha cerrado, para que un cierre lo regrese a cero.
+  // "Hoy" refleja TODO lo que aún no se ha cerrado (sin importar fecha/hora).
+  // Solo se reinicia cuando el usuario presiona "Realizar cierre del día", nunca por el reloj.
   // Los demás períodos (7 días, mes, todo) son reportes históricos e incluyen todo, cerrado o no.
   const paidOrders = state.financeRange==='hoy'
-    ? state.orders.filter(o=>o.status==='pagado' && o.paidAt>=start && !o.closingId)
+    ? state.orders.filter(o=>o.status==='pagado' && !o.closingId)
     : state.orders.filter(o=>o.status==='pagado' && o.paidAt>=start);
   const income = paidOrders.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const expenses = state.financeRange==='hoy'
-    ? state.expenses.filter(e=> e.date>=start && !e.closingId)
+    ? state.expenses.filter(e=> !e.closingId)
     : state.expenses.filter(e=> e.date>=start);
   const expenseTotal = expenses.reduce((s,e)=>s+e.amount,0);
 
   const todayStart = rangeStart('hoy');
   const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
   const todaysSalesTotal = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
-  const todaysExpensesPending = state.expenses.filter(e=>e.date>=todayStart && !e.closingId);
+  const todaysExpensesPending = state.expenses.filter(e=>!e.closingId);
   const todaysExpensesTotal = todaysExpensesPending.reduce((s,e)=>s+e.amount,0);
 
   const chips = [{id:'hoy',label:'Hoy'},{id:'semana',label:'7 días'},{id:'mes',label:'Este mes'},{id:'todo',label:'Todo'}]
@@ -850,9 +851,8 @@ async function saveBudget(){
   closeModal(); setTab('finanzas'); await loadAll();
 }
 async function performDailyClosing(){
-  const todayStart = rangeStart('hoy');
   const todaysPaid = state.orders.filter(o=>o.status==='pagado' && !o.closingId);
-  const todaysExpenses = state.expenses.filter(e=>e.date>=todayStart && !e.closingId);
+  const todaysExpenses = state.expenses.filter(e=>!e.closingId);
   const totalSales = todaysPaid.reduce((s,o)=> s + o.items.reduce((a,i)=>a+i.qty*i.price,0), 0);
   const totalExpenses = todaysExpenses.reduce((s,e)=>s+e.amount,0);
   if(todaysPaid.length===0){ alert('No hay ventas sin cerrar todavía.'); return; }
@@ -947,11 +947,10 @@ function generateClosingPdf(closingId){
   buildDailyPdf(c.date, dayOrders, dayExpenses, c.closedBy, {totalSales:c.totalSales, totalExpenses:c.totalExpenses}).save(`bahia-catracha-cierre-${c.date}.pdf`);
 }
 function downloadTodayPdf(){
-  const todayStart = rangeStart('hoy');
   const todayDate = new Date().toISOString().slice(0,10);
-  // Solo lo que aún no se ha cerrado, para que coincida con lo que muestra la pantalla de "Hoy".
-  const dayOrders = state.orders.filter(o=>o.status==='pagado' && o.paidAt>=todayStart && !o.closingId).sort((a,b)=>a.paidAt-b.paidAt);
-  const dayExpenses = state.expenses.filter(e=>e.date>=todayStart && !e.closingId).sort((a,b)=>a.date-b.date);
+  // Solo lo que aún no se ha cerrado, sin importar fecha/hora — coincide con lo que muestra la pantalla de "Hoy".
+  const dayOrders = state.orders.filter(o=>o.status==='pagado' && !o.closingId).sort((a,b)=>a.paidAt-b.paidAt);
+  const dayExpenses = state.expenses.filter(e=>!e.closingId).sort((a,b)=>a.date-b.date);
   if(!dayOrders.length && !dayExpenses.length){ alert('Todavía no hay ventas ni gastos registrados hoy.'); return; }
   buildDailyPdf(todayDate, dayOrders, dayExpenses, state.currentEmail).save(`bahia-catracha-hoy-${todayDate}.pdf`);
 }
